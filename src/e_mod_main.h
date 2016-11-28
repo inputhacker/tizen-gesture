@@ -174,4 +174,6 @@ Eina_Bool e_gesture_device_del(Ecore_Event_Device_Info *ev);
 Eina_Bool e_gesture_is_touch_device(const Ecore_Device *dev);
 void e_gesture_device_keydev_set(char *option);
 
+void e_gesture_event_filter_enable(Eina_Bool enabled);
+
 #endif

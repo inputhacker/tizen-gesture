@@ -308,12 +308,11 @@ _e_gesture_cb_bind(struct wl_client *client, void *data, uint32_t version, uint3
    wl_resource_set_implementation(resource, &_e_gesture_implementation, gesture_instance, _e_gesture_cb_destory);
 }
 
-
-
 static Eina_Bool
 _e_gesture_event_filter(void *data, void *loop_data EINA_UNUSED, int type, void *event)
 {
    (void) data;
+   if (!gesture->enable) return EINA_TRUE;
 
    return e_gesture_process_events(event, type);
 }
@@ -331,16 +330,18 @@ _e_gesture_cb_client_focus_in(void *data, int type, void *event)
 
    if (ec->gesture_disable && gesture->enable)
      {
-        GTINF("Disable gesture\n");
-        ecore_event_filter_del(gesture->ef_handler);
-        gesture->ef_handler = NULL;
+        GTINF("Gesture disabled window\n");
         gesture->enable = EINA_FALSE;
      }
    else if (!ec->gesture_disable && !gesture->enable)
      {
-        GTINF("enable gesture\n");
-        gesture->ef_handler = ecore_event_filter_add(NULL, _e_gesture_event_filter, NULL, NULL);
+        GTINF("Gesture enabled window\n");
         gesture->enable = EINA_TRUE;
+     }
+
+   if (gesture->gesture_events.num_pressed == 0)
+     {
+        e_gesture_event_filter_enable(gesture->enable);
      }
 
    return ECORE_CALLBACK_PASS_ON;
@@ -496,5 +497,20 @@ out:
              gesture->grab_client_list = eina_list_remove(gesture->grab_client_list, client_data);
              E_FREE(client_data);
           }
+     }
+}
+
+void
+e_gesture_event_filter_enable(Eina_Bool enabled)
+{
+   if (enabled && !gesture->enable)
+     {
+        GTINF("Gestures will be enabled by for now.\n");
+        gesture->enable = EINA_TRUE;
+     }
+   else if (!enabled && gesture->enable)
+     {
+        GTINF("Gestures will be enabled from now.\n");
+        gesture->enable = EINA_FALSE;
      }
 }

@@ -326,8 +326,12 @@ _e_gesture_process_mouse_button_up(void *event)
 {
    Ecore_Event_Mouse_Button *ev = event;
 
-   gesture->gesture_events.num_pressed--;
+   if (gesture->gesture_events.num_pressed == 0)
+     {
+        return EINA_TRUE;
+     }
 
+   gesture->gesture_events.num_pressed--;
    if (!gesture->grabbed_gesture)
      {
         return EINA_TRUE;
@@ -342,6 +346,14 @@ _e_gesture_process_mouse_button_up(void *event)
         if (gesture->gesture_events.num_pressed == 0)
           {
              gesture->gesture_events.recognized_gesture = 0x0;
+             if (gesture->enable)
+               {
+                  e_gesture_event_filter_enable(EINA_TRUE);
+               }
+             else
+               {
+                  e_gesture_event_filter_enable(EINA_FALSE);
+               }
           }
         return EINA_FALSE;
      }
@@ -360,6 +372,10 @@ _e_gesture_process_mouse_move(void *event)
 {
    Ecore_Event_Mouse_Move *ev = event;
 
+   if (gesture->gesture_events.num_pressed == 0)
+     {
+        return EINA_TRUE;
+     }
    if (!gesture->grabbed_gesture)
      {
         return EINA_TRUE;
