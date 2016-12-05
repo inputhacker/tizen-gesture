@@ -346,11 +346,11 @@ _e_gesture_process_mouse_button_up(void *event)
         if (gesture->gesture_events.num_pressed == 0)
           {
              gesture->gesture_events.recognized_gesture = 0x0;
-             if (gesture->enable)
+             if (!gesture->enable && gesture->enabled_window)
                {
                   e_gesture_event_filter_enable(EINA_TRUE);
                }
-             else
+             else if (gesture->enable && !gesture->enabled_window)
                {
                   e_gesture_event_filter_enable(EINA_FALSE);
                }

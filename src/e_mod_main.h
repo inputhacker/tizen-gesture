@@ -133,6 +133,7 @@ struct _E_Gesture
    struct wl_global *global;
    E_Gesture_Config_Data *config;
    Eina_Bool enable;
+   Eina_Bool enabled_window;
 
    Ecore_Event_Filter *ef_handler;
    Eina_List *handlers;

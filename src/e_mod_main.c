@@ -331,17 +331,17 @@ _e_gesture_cb_client_focus_in(void *data, int type, void *event)
    if (ec->gesture_disable && gesture->enable)
      {
         GTINF("Gesture disabled window\n");
-        gesture->enable = EINA_FALSE;
+        gesture->enabled_window = EINA_FALSE;
      }
    else if (!ec->gesture_disable && !gesture->enable)
      {
         GTINF("Gesture enabled window\n");
-        gesture->enable = EINA_TRUE;
+        gesture->enabled_window = EINA_TRUE;
      }
 
    if (gesture->gesture_events.num_pressed == 0)
      {
-        e_gesture_event_filter_enable(gesture->enable);
+        e_gesture_event_filter_enable(gesture->enabled_window);
      }
 
    return ECORE_CALLBACK_PASS_ON;
