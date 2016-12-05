@@ -4,6 +4,7 @@
 #include <e.h>
 #include <tizen-extension-server-protocol.h>
 #include <Ecore_Drm.h>
+#include <Ecore_Input_Evas.h>
 
 #define GTERR(msg, ARG...) ERR("[tizen_gesture][%s:%d] "msg, __FUNCTION__, __LINE__, ##ARG)
 #define GTWRN(msg, ARG...) WRN("[tizen_gesture][%s:%d] "msg, __FUNCTION__, __LINE__, ##ARG)
@@ -11,54 +12,70 @@
 #define GTDBG(msg, ARG...) DBG("[tizen_gesture][%s:%d] "msg, __FUNCTION__, __LINE__, ##ARG)
 
 #define E_GESTURE_FINGER_MAX 3
-#define E_GESTURE_TYPE_MAX TIZEN_GESTURE_TYPE_SWIPE+1
-#define E_GESTURE_TYPE_ALL TIZEN_GESTURE_TYPE_SWIPE
+#define E_GESTURE_TYPE_MAX TIZEN_GESTURE_TYPE_EDGE_SWIPE+1
+#define E_GESTURE_TYPE_ALL TIZEN_GESTURE_TYPE_EDGE_SWIPE
 #define E_GESTURE_KEYBOARD_NAME "Gesture Keyboard"
 
 /* FIX ME: Set values in contiguration file, do not use definition */
 #define E_GESTURE_KEYBOARD_DEVICE "Any"
 
-#define E_GESTURE_SWIPE_DONE_TIME 0.5
-#define E_GESTURE_SWIPE_START_TIME 0.01
-#define E_GESTURE_SWIPE_START_AREA 50
-#define E_GESTURE_SWIPE_DIFF_FAIL 100
-#define E_GESTURE_SWIPE_DIFF_SUCCESS 300
+#define E_GESTURE_EDGE_SWIPE_DONE_TIME 0.5
+#define E_GESTURE_EDGE_SWIPE_START_TIME 0.01
+#define E_GESTURE_EDGE_SWIPE_START_AREA 50
+#define E_GESTURE_EDGE_SWIPE_DIFF_FAIL 100
+#define E_GESTURE_EDGE_SWIPE_DIFF_SUCCESS 300
 /* FIX ME: Key code will be get from keymap */
-#define E_GESTURE_SWIPE_COMBINE_KEY 124
-#define E_GESTURE_SWIPE_BACK_KEY 166
-#define E_GESTURE_SWIPE_BACK_DEFAULT_ENABLE EINA_TRUE
+#define E_GESTURE_EDGE_SWIPE_COMBINE_KEY 124
+#define E_GESTURE_EDGE_SWIPE_BACK_KEY 166
+#define E_GESTURE_EDGE_SWIPE_BACK_DEFAULT_ENABLE EINA_TRUE
 
 #define ABS(x) ((x)>0)?(x):-(x)
 
 typedef struct _E_Gesture E_Gesture;
 typedef struct _E_Gesture* E_GesturePtr;
 typedef struct _E_Gesture_Event E_Gesture_Event;
-typedef struct _E_Gesture_Event_Swipe E_Gesture_Event_Swipe;
-typedef struct _E_Gesture_Event_Swipe_Finger E_Gesture_Event_Swipe_Finger;
-typedef struct _E_Gesture_Event_Swipe_Finger_Direction E_Gesture_Event_Swipe_Finger_Direction;
+typedef struct _E_Gesture_Event_Edge_Swipe E_Gesture_Event_Edge_Swipe;
+typedef struct _E_Gesture_Event_Edge_Swipe_Finger E_Gesture_Event_Edge_Swipe_Finger;
+typedef struct _E_Gesture_Event_Edge_Swipe_Finger_Edge E_Gesture_Event_Edge_Swipe_Finger_Edge;
 typedef struct _E_Gesture_Grabbed_Client E_Gesture_Grabbed_Client;
 typedef struct _E_Gesture_Conf_Edd E_Gesture_Conf_Edd;
 typedef struct _E_Gesture_Config_Data E_Gesture_Config_Data;
 
 typedef struct _Coords Coords;
+typedef struct _E_Gesture_Event_Info E_Gesture_Event_Info;
 
-typedef enum _E_Gesture_Direction E_Gesture_Direction;
+typedef enum _E_Gesture_Edge E_Gesture_Edge;
+typedef enum _E_Gesture_Event_State E_Gesture_Event_State;
 
 extern E_GesturePtr gesture;
 
-#define E_GESTURE_DIRECTION_MAX 4
-enum _E_Gesture_Direction
+#define E_GESTURE_EDGE_MAX 4
+
+enum _E_Gesture_Edge
 {
-   E_GESTURE_DIRECTION_NONE,
-   E_GESTURE_DIRECTION_DOWN, //Start point is North
-   E_GESTURE_DIRECTION_LEFT, // Start point is East
-   E_GESTURE_DIRECTION_UP, // Start point is South
-   E_GESTURE_DIRECTION_RIGHT // Start point is West
+   E_GESTURE_EDGE_NONE,
+   E_GESTURE_EDGE_TOP,
+   E_GESTURE_EDGE_RIGHT,
+   E_GESTURE_EDGE_BOTTOM,
+   E_GESTURE_EDGE_LEFT
+};
+
+enum _E_Gesture_Event_State
+{
+   E_GESTURE_EVENT_STATE_PROPAGATE,
+   E_GESTURE_EVENT_STATE_KEEP,
+   E_GESTURE_EVENT_STATE_IGNORE
 };
 
 struct _Coords
 {
    int x, y;
+};
+
+struct _E_Gesture_Event_Info
+{
+   int type;
+   void *event;
 };
 
 struct _E_Gesture_Conf_Edd
@@ -74,7 +91,8 @@ struct _E_Gesture_Conf_Edd
       int compose_key;
       int back_key;
       Eina_Bool default_enable_back;
-   } swipe;
+      Eina_Bool event_keep;
+   } edge_swipe;
 };
 
 struct _E_Gesture_Config_Data
@@ -84,17 +102,17 @@ struct _E_Gesture_Config_Data
    E_Gesture_Conf_Edd *conf;
 };
 
-struct _E_Gesture_Event_Swipe_Finger_Direction
+struct _E_Gesture_Event_Edge_Swipe_Finger_Edge
 {
    struct wl_client *client;
    struct wl_resource *res;
 };
 
-struct _E_Gesture_Event_Swipe_Finger
+struct _E_Gesture_Event_Edge_Swipe_Finger
 {
    Coords start;
    Eina_Bool enabled;
-   E_Gesture_Event_Swipe_Finger_Direction direction[E_GESTURE_DIRECTION_MAX+1];
+   E_Gesture_Event_Edge_Swipe_Finger_Edge edge[E_GESTURE_EDGE_MAX+1];
 };
 
 struct _E_Gesture_Grabbed_Client
@@ -102,15 +120,15 @@ struct _E_Gesture_Grabbed_Client
    struct wl_client *client;
    struct wl_listener *destroy_listener;
 
-   E_Gesture_Event_Swipe_Finger swipe_fingers[E_GESTURE_FINGER_MAX+1];
+   E_Gesture_Event_Edge_Swipe_Finger edge_swipe_fingers[E_GESTURE_FINGER_MAX+1];
 };
 
 
-struct _E_Gesture_Event_Swipe
+struct _E_Gesture_Event_Edge_Swipe
 {
-   E_Gesture_Event_Swipe_Finger fingers[E_GESTURE_FINGER_MAX+1];
+   E_Gesture_Event_Edge_Swipe_Finger fingers[E_GESTURE_FINGER_MAX+1];
 
-   E_Gesture_Direction direction;
+   unsigned int edge;
 
    unsigned int combined_keycode;
    unsigned int back_keycode;
@@ -118,11 +136,13 @@ struct _E_Gesture_Event_Swipe
    unsigned int enabled_finger;
    Ecore_Timer *start_timer;
    Ecore_Timer *done_timer;
+
+   Eina_Bool event_keep;
 };
 
 struct _E_Gesture_Event
 {
-   E_Gesture_Event_Swipe swipes;
+   E_Gesture_Event_Edge_Swipe edge_swipes;
 
    int num_pressed;
    Eina_Bool recognized_gesture;
@@ -150,6 +170,9 @@ struct _E_Gesture
 
    unsigned int grabbed_gesture;
    E_Gesture_Event gesture_events;
+   E_Gesture_Event_State event_state;
+
+   Eina_List *event_queue;
 
    unsigned int gesture_filter;
    unsigned int gesture_recognized;
@@ -170,8 +193,8 @@ void e_gesture_conf_deinit(E_Gesture_Config_Data *gconfig);
 
 /* Device control */
 void e_gesture_device_shutdown(void);
-Eina_Bool e_gesture_device_add(Ecore_Event_Device_Info *ev);
-Eina_Bool e_gesture_device_del(Ecore_Event_Device_Info *ev);
+E_Gesture_Event_State e_gesture_device_add(Ecore_Event_Device_Info *ev);
+E_Gesture_Event_State e_gesture_device_del(Ecore_Event_Device_Info *ev);
 Eina_Bool e_gesture_is_touch_device(const Ecore_Device *dev);
 void e_gesture_device_keydev_set(char *option);
 

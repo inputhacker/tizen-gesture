@@ -84,7 +84,7 @@ _e_gesture_device_ecore_device_get(char *path, unsigned int clas)
    return NULL;
 }
 
-Eina_Bool
+E_Gesture_Event_State
 e_gesture_device_add(Ecore_Event_Device_Info *ev)
 {
    if (ev->clas == ECORE_DEVICE_CLASS_TOUCH)
@@ -112,10 +112,10 @@ e_gesture_device_add(Ecore_Event_Device_Info *ev)
              gesture->device.kbd_device = _e_gesture_device_ecore_device_get(gesture->device.kbd_identifier, ECORE_DEVICE_CLASS_KEYBOARD);
           }
      }
-   return EINA_TRUE;
+   return E_GESTURE_EVENT_STATE_PROPAGATE;
 }
 
-Eina_Bool
+E_Gesture_Event_State
 e_gesture_device_del(Ecore_Event_Device_Info *ev)
 {
    Eina_List *l, *l_next;
@@ -143,7 +143,7 @@ e_gesture_device_del(Ecore_Event_Device_Info *ev)
              E_FREE(gesture->device.kbd_name);
           }
      }
-   return EINA_TRUE;
+   return E_GESTURE_EVENT_STATE_PROPAGATE;
 }
 
 Eina_Bool
