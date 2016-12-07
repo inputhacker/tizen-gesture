@@ -472,7 +472,7 @@ _e_gesture_process_mouse_button_up(void *event)
 
    if (gesture->gesture_events.num_pressed == 0)
      {
-        return EINA_TRUE;
+        return E_GESTURE_EVENT_STATE_PROPAGATE;
      }
 
    gesture->gesture_events.num_pressed--;
@@ -518,7 +518,7 @@ _e_gesture_process_mouse_move(void *event)
 
    if (gesture->gesture_events.num_pressed == 0)
      {
-        return EINA_TRUE;
+        return gesture->event_state;
      }
    if (!gesture->grabbed_gesture)
      {
