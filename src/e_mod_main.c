@@ -319,17 +319,9 @@ _e_gesture_event_filter(void *data, void *loop_data EINA_UNUSED, int type, void 
    return e_gesture_process_events(event, type);
 }
 
-static Eina_Bool
-_e_gesture_cb_client_focus_in(void *data, int type, void *event)
+static void
+_e_gesture_window_gesture_disabled_change(E_Client *ec)
 {
-   E_Client *ec;
-   E_Event_Client *ev = (E_Event_Client *)event;
-
-   EINA_SAFETY_ON_NULL_RETURN_VAL(ev, ECORE_CALLBACK_PASS_ON);
-   ec = ev->ec;
-   EINA_SAFETY_ON_NULL_RETURN_VAL(ec, ECORE_CALLBACK_PASS_ON);
-   EINA_SAFETY_ON_NULL_RETURN_VAL(ec->comp_data, ECORE_CALLBACK_PASS_ON);
-
    if (ec->gesture_disable && gesture->enable)
      {
         GTINF("Gesture disabled window\n");
@@ -345,8 +337,37 @@ _e_gesture_cb_client_focus_in(void *data, int type, void *event)
      {
         e_gesture_event_filter_enable(gesture->enabled_window);
      }
+}
+
+static Eina_Bool
+_e_gesture_cb_client_focus_in(void *data, int type, void *event)
+{
+   E_Client *ec;
+   E_Event_Client *ev = (E_Event_Client *)event;
+
+   EINA_SAFETY_ON_NULL_RETURN_VAL(ev, ECORE_CALLBACK_PASS_ON);
+   ec = ev->ec;
+   EINA_SAFETY_ON_NULL_RETURN_VAL(ec, ECORE_CALLBACK_PASS_ON);
+   EINA_SAFETY_ON_NULL_RETURN_VAL(ec->comp_data, ECORE_CALLBACK_PASS_ON);
+
+   _e_gesture_window_gesture_disabled_change(ec);
 
    return ECORE_CALLBACK_PASS_ON;
+}
+
+static void
+_e_gesture_cb_aux_hint_change(void *data EINA_UNUSED, E_Client *ec)
+{
+   E_Comp_Wl_Aux_Hint *hint;
+   Eina_List *l;
+
+   if (e_object_is_del(E_OBJECT(ec)) || !ec->comp_data) return;
+   if (!ec->comp_data->aux_hint.changed) return;
+
+   /* Return if the aux hint change didn't happen to the focused ec */
+   if (ec != e_client_focused_get()) return;
+
+   _e_gesture_window_gesture_disabled_change(ec);
 }
 
 static void
@@ -377,7 +398,7 @@ _e_gesture_init(E_Module *m)
         goto err;
      }
 
-   /* Add filtering mechanism 
+   /* Add filtering mechanism
     * FIXME: Add handlers after first gesture is grabbed
     */
    _e_gesture_init_handlers();
@@ -419,7 +440,7 @@ _e_gesture_init(E_Module *m)
      }
 
    e_gesture_device_keydev_set(gesture->config->conf->key_device_name);
-
+   e_client_hook_add(E_CLIENT_HOOK_AUX_HINT_CHANGE, _e_gesture_cb_aux_hint_change, NULL);
    gesture->enable = EINA_TRUE;
 
    return gconfig;

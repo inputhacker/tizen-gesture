@@ -15,6 +15,7 @@
 #define E_GESTURE_TYPE_MAX TIZEN_GESTURE_TYPE_EDGE_SWIPE+1
 #define E_GESTURE_TYPE_ALL TIZEN_GESTURE_TYPE_EDGE_SWIPE
 #define E_GESTURE_KEYBOARD_NAME "Gesture Keyboard"
+#define E_GESTURE_AUX_HINT_GESTURE_DISABLE "wm.policy.win.gesture.disable"
 
 /* FIX ME: Set values in contiguration file, do not use definition */
 #define E_GESTURE_KEYBOARD_DEVICE "Any"
