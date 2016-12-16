@@ -358,9 +358,6 @@ _e_gesture_cb_client_focus_in(void *data, int type, void *event)
 static void
 _e_gesture_cb_aux_hint_change(void *data EINA_UNUSED, E_Client *ec)
 {
-   E_Comp_Wl_Aux_Hint *hint;
-   Eina_List *l;
-
    if (e_object_is_del(E_OBJECT(ec)) || !ec->comp_data) return;
    if (!ec->comp_data->aux_hint.changed) return;
 
@@ -378,6 +375,29 @@ _e_gesture_init_handlers(void)
    gesture->handlers = eina_list_append(gesture->handlers,
                                         ecore_event_handler_add(E_EVENT_CLIENT_FOCUS_IN,
                                                                 _e_gesture_cb_client_focus_in, NULL));
+
+   gesture->hooks = eina_list_append(gesture->hooks,
+                                     e_client_hook_add(E_CLIENT_HOOK_AUX_HINT_CHANGE,
+                                                       _e_gesture_cb_aux_hint_change, NULL));
+}
+
+static void
+_e_gesture_deinit_handlers(void)
+{
+   Ecore_Event_Handler *event_handler;
+   E_Client_Hook *hook;
+
+   ecore_event_filter_del(gesture->ef_handler);
+
+   EINA_LIST_FREE(gesture->handlers, event_handler)
+     {
+        ecore_event_handler_del(event_handler);
+     }
+
+   EINA_LIST_FREE(gesture->hooks, hook)
+     {
+        e_client_hook_del(hook);
+     }
 }
 
 static E_Gesture_Config_Data *
@@ -440,7 +460,6 @@ _e_gesture_init(E_Module *m)
      }
 
    e_gesture_device_keydev_set(gesture->config->conf->key_device_name);
-   e_client_hook_add(E_CLIENT_HOOK_AUX_HINT_CHANGE, _e_gesture_cb_aux_hint_change, NULL);
    gesture->enable = EINA_TRUE;
 
    return gconfig;
@@ -465,6 +484,7 @@ e_modapi_shutdown(E_Module *m)
    E_Gesture_Config_Data *gconfig = m->data;
    e_gesture_conf_deinit(gconfig);
    e_gesture_device_shutdown();
+   _e_gesture_deinit_handlers();
    return 1;
 }
 
