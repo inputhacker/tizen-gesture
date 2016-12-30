@@ -14,6 +14,7 @@ BuildRequires:  gettext
 BuildRequires:  pkgconfig(wayland-server)
 BuildRequires:  pkgconfig(tizen-extension-server)
 BuildRequires:  pkgconfig(dlog)
+BuildRequires:  pkgconfig(tzsh-server)
 
 %global TZ_SYS_RO_SHARE  %{?TZ_SYS_RO_SHARE:%TZ_SYS_RO_SHARE}%{!?TZ_SYS_RO_SHARE:/usr/share}
 

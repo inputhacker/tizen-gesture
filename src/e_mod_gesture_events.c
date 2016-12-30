@@ -322,11 +322,13 @@ _e_gesture_process_edge_swipe_down(Ecore_Event_Mouse_Button *ev)
                _e_gesture_event_flush();
              _e_gesture_edge_swipe_cancel();
           }
-
-        edge_swipes->fingers[idx].start.x = ev->x;
-        edge_swipes->fingers[idx].start.y = ev->y;
-        edge_swipes->start_timer = ecore_timer_add(conf->edge_swipe.time_begin, _e_gesture_timer_edge_swipe_start, NULL);
-        edge_swipes->done_timer = ecore_timer_add(conf->edge_swipe.time_done, _e_gesture_timer_edge_swipe_done, NULL);
+        if (edge_swipes->edge != E_GESTURE_EDGE_NONE)
+          {
+             edge_swipes->fingers[idx].start.x = ev->x;
+             edge_swipes->fingers[idx].start.y = ev->y;
+             edge_swipes->start_timer = ecore_timer_add(conf->edge_swipe.time_begin, _e_gesture_timer_edge_swipe_start, NULL);
+             edge_swipes->done_timer = ecore_timer_add(conf->edge_swipe.time_done, _e_gesture_timer_edge_swipe_done, NULL);
+          }
      }
    else
      {
@@ -429,8 +431,6 @@ _e_gesture_process_mouse_button_down(void *event)
 {
    Ecore_Event_Mouse_Button *ev = event;
 
-   gesture->gesture_events.num_pressed++;
-
    if (!gesture->grabbed_gesture)
      {
         return E_GESTURE_EVENT_STATE_PROPAGATE;
@@ -470,12 +470,6 @@ _e_gesture_process_mouse_button_up(void *event)
 {
    Ecore_Event_Mouse_Button *ev = event;
 
-   if (gesture->gesture_events.num_pressed == 0)
-     {
-        return E_GESTURE_EVENT_STATE_PROPAGATE;
-     }
-
-   gesture->gesture_events.num_pressed--;
    if (!gesture->grabbed_gesture)
      {
         return E_GESTURE_EVENT_STATE_PROPAGATE;
@@ -490,14 +484,6 @@ _e_gesture_process_mouse_button_up(void *event)
         if (gesture->gesture_events.num_pressed == 0)
           {
              gesture->gesture_events.recognized_gesture = 0x0;
-             if (!gesture->enable && gesture->enabled_window)
-               {
-                  e_gesture_event_filter_enable(EINA_TRUE);
-               }
-             else if (gesture->enable && !gesture->enabled_window)
-               {
-                  e_gesture_event_filter_enable(EINA_FALSE);
-               }
           }
         return E_GESTURE_EVENT_STATE_IGNORE;
      }

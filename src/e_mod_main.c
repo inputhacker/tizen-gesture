@@ -1,6 +1,7 @@
 #define E_COMP_WL
 #include "e_mod_main.h"
 #include <string.h>
+#include "e_service_quickpanel.h"
 
 E_GesturePtr gesture = NULL;
 E_API E_Module_Api e_modapi = { E_MODULE_API_VERSION, "Gesture Module of Window Manager" };
@@ -314,6 +315,30 @@ static Eina_Bool
 _e_gesture_event_filter(void *data, void *loop_data EINA_UNUSED, int type, void *event)
 {
    (void) data;
+
+   if (type == ECORE_EVENT_MOUSE_BUTTON_DOWN)
+     {
+        gesture->gesture_events.num_pressed++;
+     }
+   else if (type == ECORE_EVENT_MOUSE_BUTTON_UP)
+     {
+        gesture->gesture_events.num_pressed--;
+        if (gesture->gesture_events.num_pressed < 0)
+          gesture->gesture_events.num_pressed = 0;
+        if (gesture->gesture_events.num_pressed == 0)
+          {
+             if (!gesture->enable && gesture->enabled_window)
+               {
+                  e_gesture_event_filter_enable(EINA_TRUE);
+                  return EINA_TRUE;
+               }
+             else if (gesture->enable && !gesture->enabled_window)
+               {
+                  e_gesture_event_filter_enable(EINA_FALSE);
+                  return e_gesture_process_events(event, type);
+               }
+          }
+     }
    if (!gesture->enable) return EINA_TRUE;
 
    return e_gesture_process_events(event, type);
@@ -358,11 +383,16 @@ _e_gesture_cb_client_focus_in(void *data, int type, void *event)
 static void
 _e_gesture_cb_aux_hint_change(void *data EINA_UNUSED, E_Client *ec)
 {
+   E_Client *qp_ec;
    if (e_object_is_del(E_OBJECT(ec)) || !ec->comp_data) return;
    if (!ec->comp_data->aux_hint.changed) return;
 
+   qp_ec = e_service_quickpanel_client_get();
+
    /* Return if the aux hint change didn't happen to the focused ec */
-   if (ec != e_client_focused_get()) return;
+   if ((ec != qp_ec) &&
+       (ec != e_client_focused_get()))
+     return;
 
    _e_gesture_window_gesture_disabled_change(ec);
 }
