@@ -89,7 +89,9 @@ e_gesture_device_add(Ecore_Event_Device_Info *ev)
 {
    if (ev->clas == ECORE_DEVICE_CLASS_TOUCH)
      {
-        gesture->device.touch_devices = eina_list_append(gesture->device.touch_devices, ev->identifier);
+        char *id;
+        id = strdup(ev->identifier);
+        gesture->device.touch_devices = eina_list_append(gesture->device.touch_devices, id);
         GTINF("%s(%s) device is touch device: add list\n", ev->name, ev->identifier);
      }
    if ((!gesture->device.kbd_identifier) &&
