@@ -502,6 +502,10 @@ _e_gesture_process_mouse_move(void *event)
 {
    Ecore_Event_Mouse_Move *ev = event;
 
+   if (e_gesture_is_touch_device(ev->dev) == EINA_FALSE)
+     {
+        return E_GESTURE_EVENT_STATE_PROPAGATE;
+     }
    if (gesture->gesture_events.num_pressed == 0)
      {
         return gesture->event_state;
@@ -510,11 +514,6 @@ _e_gesture_process_mouse_move(void *event)
      {
         return E_GESTURE_EVENT_STATE_PROPAGATE;
      }
-   if (e_gesture_is_touch_device(ev->dev) == EINA_FALSE)
-     {
-        return E_GESTURE_EVENT_STATE_PROPAGATE;
-     }
-
    if (gesture->gesture_events.recognized_gesture)
      {
         return E_GESTURE_EVENT_STATE_IGNORE;
