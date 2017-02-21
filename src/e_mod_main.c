@@ -955,10 +955,33 @@ e_modapi_init(E_Module *m)
 E_API int
 e_modapi_shutdown(E_Module *m)
 {
+   Eina_List *l, *l_next;
+   E_Gesture_Grabbed_Client *gclient;
+   E_Gesture_Event_Info *event_info;
    E_Gesture_Config_Data *gconfig = m->data;
+
    e_gesture_conf_deinit(gconfig);
    e_gesture_device_shutdown();
    _e_gesture_deinit_handlers();
+
+   EINA_LIST_FOREACH_SAFE(gesture->grab_client_list, l, l_next, gclient)
+     {
+        if (gclient->destroy_listener)
+          {
+             wl_list_remove(&gclient->destroy_listener->link);
+             E_FREE(gclient->destroy_listener);
+          }
+        E_FREE(gclient);
+        gesture->grab_client_list = eina_list_remove_list(gesture->grab_client_list, l);
+     }
+
+   EINA_LIST_FOREACH_SAFE(gesture->event_queue, l, l_next, event_info)
+     {
+        E_FREE(event_info->event);
+        E_FREE(event_info);
+        gesture->event_queue = eina_list_remove_list(gesture->event_queue, l);
+     }
+
    return 1;
 }
 
