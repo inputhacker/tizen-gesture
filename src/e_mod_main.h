@@ -36,7 +36,12 @@
 #define E_GESTURE_TAP_INTERVAL_TIME 1
 #define E_GESTURE_TAP_MOVING_LANGE 25
 
+#define E_GESTURE_PAN_START_TIME 0.05
+#define E_GESTURE_PAN_MOVING_RANGE 15
+
 #define ABS(x) (((x)>0)?(x):-(x))
+
+#define RAD2DEG(x) ((x) * 57.295779513)
 
 typedef struct _E_Gesture E_Gesture;
 typedef struct _E_Gesture* E_GesturePtr;
@@ -52,13 +57,17 @@ typedef struct _E_Gesture_Event_Tap_Finger_Repeats E_Gesture_Event_Tap_Finger_Re
 typedef struct _E_Gesture_Event_Tap_Finger E_Gesture_Event_Tap_Finger;
 typedef struct _E_Gesture_Event_Tap E_Gesture_Event_Tap;
 
+typedef struct _E_Gesture_Event_Pan E_Gesture_Event_Pan;
+
 typedef struct _Coords Coords;
 typedef struct _E_Gesture_Finger E_Gesture_Finger;
 typedef struct _E_Gesture_Event_Info E_Gesture_Event_Info;
+typedef struct _E_Gesture_Event_Client E_Gesture_Event_Client;
 
 typedef enum _E_Gesture_Edge E_Gesture_Edge;
 typedef enum _E_Gesture_Event_State E_Gesture_Event_State;
 typedef enum _E_Gesture_Tap_State E_Gesture_Tap_State;
+typedef enum _E_Gesture_Pan_State E_Gesture_Pan_State;
 
 extern E_GesturePtr gesture;
 
@@ -89,6 +98,15 @@ enum _E_Gesture_Tap_State
    E_GESTURE_TAP_STATE_PROCESS, // all fingers are pressed or first release
    E_GESTURE_TAP_STATE_WAIT, // all fingers are released and wait next tap
    E_GESTURE_TAP_STATE_DONE
+};
+
+enum _E_Gesture_Pan_State
+{
+   E_GESTURE_PAN_STATE_NONE,
+   E_GESTURE_PAN_STATE_READY,
+   E_GESTURE_PAN_STATE_START,
+   E_GESTURE_PAN_STATE_MOVING,
+   E_GESTURE_PAN_STATE_DONE
 };
 
 struct _Coords
@@ -132,6 +150,12 @@ struct _E_Gesture_Config_Data
    E_Gesture_Conf_Edd *conf;
 };
 
+struct _E_Gesture_Event_Client
+{
+   struct wl_client *client;
+   struct wl_resource *res;
+};
+
 struct _E_Gesture_Event_Edge_Swipe_Finger_Edge
 {
    struct wl_client *client;
@@ -150,13 +174,13 @@ struct _E_Gesture_Grabbed_Client
    struct wl_client *client;
    struct wl_listener *destroy_listener;
 
-   E_Gesture_Event_Edge_Swipe_Finger edge_swipe_fingers[E_GESTURE_FINGER_MAX+1];
+   E_Gesture_Event_Edge_Swipe_Finger edge_swipe_fingers[E_GESTURE_FINGER_MAX+2];
 };
 
 
 struct _E_Gesture_Event_Edge_Swipe
 {
-   E_Gesture_Event_Edge_Swipe_Finger fingers[E_GESTURE_FINGER_MAX+1];
+   E_Gesture_Event_Edge_Swipe_Finger fingers[E_GESTURE_FINGER_MAX+2];
 
    unsigned int edge;
 
@@ -187,7 +211,7 @@ struct _E_Gesture_Event_Tap_Finger
 
 struct _E_Gesture_Event_Tap
 {
-   E_Gesture_Event_Tap_Finger fingers[E_GESTURE_FINGER_MAX+1];
+   E_Gesture_Event_Tap_Finger fingers[E_GESTURE_FINGER_MAX+2];
    E_Gesture_Tap_State state;
    unsigned int enabled_finger;
    unsigned int repeats;
@@ -201,12 +225,26 @@ struct _E_Gesture_Event_Tap
    Ecore_Timer *interval_timer;
 };
 
+struct _E_Gesture_Event_Pan
+{
+   E_Gesture_Event_Client fingers[E_GESTURE_FINGER_MAX + 2];
+   E_Gesture_Pan_State state;
+   Coords start_point;
+   Coords prev_point;
+   Coords center_point;
+   int num_pan_fingers;
+
+   Ecore_Timer *start_timer;
+   Ecore_Timer *move_timer;
+};
+
 struct _E_Gesture_Event
 {
    E_Gesture_Event_Edge_Swipe edge_swipes;
    E_Gesture_Event_Tap taps;
+   E_Gesture_Event_Pan pans;
 
-   E_Gesture_Finger base_point[E_GESTURE_FINGER_MAX + 1];
+   E_Gesture_Finger base_point[E_GESTURE_FINGER_MAX+2];
 
    int num_pressed;
    Eina_Bool recognized_gesture;

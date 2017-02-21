@@ -66,6 +66,82 @@ e_gesture_add_client_destroy_listener(struct wl_client *client, int mode EINA_UN
    return TIZEN_KEYROUTER_ERROR_NONE;
 }
 
+static int
+_e_gesture_grab_pan(struct wl_client *client, struct wl_resource *resource, uint32_t num_of_fingers)
+{
+   E_Gesture_Event *gev;
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   GTINF("The client %p request to grab pan gesture, fingers: %d\n", client, num_of_fingers);
+
+   if (num_of_fingers > E_GESTURE_FINGER_MAX)
+     {
+        GTWRN("Do not support %d fingers (max: %d)\n", num_of_fingers, E_GESTURE_FINGER_MAX);
+        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
+        goto finish;
+     }
+
+   gev = &gesture->gesture_events;
+
+   if (gev->pans.fingers[num_of_fingers].client)
+     {
+        GTWRN("%d finger is already grabbed by %p client\n", num_of_fingers, gev->pans.fingers[num_of_fingers].client);
+        ret = TIZEN_GESTURE_ERROR_GRABBED_ALREADY;
+        goto finish;
+     }
+
+   gev->pans.fingers[num_of_fingers].client = client;
+   gev->pans.fingers[num_of_fingers].res = resource;
+   gev->pans.state = E_GESTURE_PAN_STATE_READY;
+
+   gesture->grabbed_gesture |= TIZEN_GESTURE_TYPE_PAN;
+   gesture->gesture_filter = E_GESTURE_TYPE_ALL & ~gesture->grabbed_gesture;
+
+finish:
+   return ret;
+}
+
+static int
+_e_gesture_ungrab_pan(struct wl_client *client, struct wl_resource *resource, uint32_t num_of_fingers)
+{
+   int i;
+   E_Gesture_Event *gev;
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   GTINF("The client %p request to ungrab pan gesture, fingers: %d\n", client, num_of_fingers);
+
+   if (num_of_fingers > E_GESTURE_FINGER_MAX)
+     {
+        GTWRN("Do not support %d fingers (max: %d)\n", num_of_fingers, E_GESTURE_FINGER_MAX);
+        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
+        goto finish;
+     }
+
+   gev = &gesture->gesture_events;
+
+   if (gev->pans.fingers[num_of_fingers].client == client)
+     {
+        gev->pans.fingers[num_of_fingers].client = NULL;
+        gev->pans.fingers[num_of_fingers].res = NULL;
+     }
+
+   gesture->grabbed_gesture &= ~TIZEN_GESTURE_TYPE_TAP;
+   gev->pans.state = E_GESTURE_PAN_STATE_NONE;
+
+   for (i = 0; i < E_GESTURE_FINGER_MAX; i++)
+     {
+        if (gev->pans.fingers[i].client)
+          {
+             gesture->grabbed_gesture |= TIZEN_GESTURE_TYPE_PAN;
+             gev->pans.state = E_GESTURE_PAN_STATE_READY;
+             break;
+          }
+     }
+
+finish:
+   return ret;
+}
+
 static void
 _e_gesture_remove_client_destroy_listener(struct wl_client *client, unsigned int fingers, unsigned int edge)
 {
@@ -392,11 +468,37 @@ finish:
    tizen_gesture_send_tap_notify(resource, fingers, repeats, ret);
 }
 
+static void
+_e_gesture_cb_grab_pan(struct wl_client *client,
+                   struct wl_resource *resource,
+                   uint32_t num_of_fingers)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = _e_gesture_grab_pan(client, resource, num_of_fingers);
+
+   tizen_gesture_send_pan_notify(resource, num_of_fingers, ret);
+}
+
+static void
+_e_gesture_cb_ungrab_pan(struct wl_client *client,
+                   struct wl_resource *resource,
+                   uint32_t num_of_fingers)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = _e_gesture_ungrab_pan(client, resource, num_of_fingers);
+
+   tizen_gesture_send_pan_notify(resource, num_of_fingers, ret);
+}
+
 static const struct tizen_gesture_interface _e_gesture_implementation = {
    _e_gesture_cb_grab_edge_swipe,
    _e_gesture_cb_ungrab_edge_swipe,
    _e_gesture_cb_grab_tap,
-   _e_gesture_cb_ungrab_tap
+   _e_gesture_cb_ungrab_tap,
+   _e_gesture_cb_grab_pan,
+   _e_gesture_cb_ungrab_pan,
 };
 
 /* tizen_gesture global object destroy function */
