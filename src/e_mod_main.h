@@ -12,8 +12,8 @@
 #define GTDBG(msg, ARG...) DBG("[tizen_gesture][%s:%d] "msg, __FUNCTION__, __LINE__, ##ARG)
 
 #define E_GESTURE_FINGER_MAX 3
-#define E_GESTURE_TYPE_MAX TIZEN_GESTURE_TYPE_EDGE_SWIPE+1
-#define E_GESTURE_TYPE_ALL TIZEN_GESTURE_TYPE_EDGE_SWIPE
+#define E_GESTURE_TYPE_MAX TIZEN_GESTURE_TYPE_TAP+1
+#define E_GESTURE_TYPE_ALL (TIZEN_GESTURE_TYPE_EDGE_SWIPE | TIZEN_GESTURE_TYPE_TAP)
 #define E_GESTURE_KEYBOARD_NAME "Gesture Keyboard"
 #define E_GESTURE_AUX_HINT_GESTURE_DISABLE "wm.policy.win.gesture.disable"
 
@@ -30,7 +30,13 @@
 #define E_GESTURE_EDGE_SWIPE_BACK_KEY 166
 #define E_GESTURE_EDGE_SWIPE_BACK_DEFAULT_ENABLE EINA_TRUE
 
-#define ABS(x) ((x)>0)?(x):-(x)
+#define E_GESTURE_TAP_REPEATS_MAX 3
+#define E_GESTURE_TAP_START_TIME 0.05
+#define E_GESTURE_TAP_DONE_TIME 1
+#define E_GESTURE_TAP_INTERVAL_TIME 1
+#define E_GESTURE_TAP_MOVING_LANGE 25
+
+#define ABS(x) (((x)>0)?(x):-(x))
 
 typedef struct _E_Gesture E_Gesture;
 typedef struct _E_Gesture* E_GesturePtr;
@@ -42,11 +48,17 @@ typedef struct _E_Gesture_Grabbed_Client E_Gesture_Grabbed_Client;
 typedef struct _E_Gesture_Conf_Edd E_Gesture_Conf_Edd;
 typedef struct _E_Gesture_Config_Data E_Gesture_Config_Data;
 
+typedef struct _E_Gesture_Event_Tap_Finger_Repeats E_Gesture_Event_Tap_Finger_Repeats;
+typedef struct _E_Gesture_Event_Tap_Finger E_Gesture_Event_Tap_Finger;
+typedef struct _E_Gesture_Event_Tap E_Gesture_Event_Tap;
+
 typedef struct _Coords Coords;
+typedef struct _E_Gesture_Finger E_Gesture_Finger;
 typedef struct _E_Gesture_Event_Info E_Gesture_Event_Info;
 
 typedef enum _E_Gesture_Edge E_Gesture_Edge;
 typedef enum _E_Gesture_Event_State E_Gesture_Event_State;
+typedef enum _E_Gesture_Tap_State E_Gesture_Tap_State;
 
 extern E_GesturePtr gesture;
 
@@ -69,9 +81,25 @@ enum _E_Gesture_Event_State
    E_GESTURE_EVENT_STATE_IGNORE
 };
 
+enum _E_Gesture_Tap_State
+{
+   E_GESTURE_TAP_STATE_NONE,
+   E_GESTURE_TAP_STATE_READY, // tap is required, idle
+   E_GESTURE_TAP_STATE_START, // first finger is pressed
+   E_GESTURE_TAP_STATE_PROCESS, // all fingers are pressed or first release
+   E_GESTURE_TAP_STATE_WAIT, // all fingers are released and wait next tap
+   E_GESTURE_TAP_STATE_DONE
+};
+
 struct _Coords
 {
    int x, y;
+};
+
+struct _E_Gesture_Finger
+{
+   Eina_Bool pressed;
+   Coords axis;
 };
 
 struct _E_Gesture_Event_Info
@@ -144,9 +172,41 @@ struct _E_Gesture_Event_Edge_Swipe
    Eina_Bool event_keep;
 };
 
+struct _E_Gesture_Event_Tap_Finger_Repeats
+{
+   struct wl_client *client;
+   struct wl_resource *res;
+};
+
+struct _E_Gesture_Event_Tap_Finger
+{
+   Eina_Bool enabled;
+   unsigned int max_repeats;
+   E_Gesture_Event_Tap_Finger_Repeats repeats[E_GESTURE_TAP_REPEATS_MAX+1];
+};
+
+struct _E_Gesture_Event_Tap
+{
+   E_Gesture_Event_Tap_Finger fingers[E_GESTURE_FINGER_MAX+1];
+   E_Gesture_Tap_State state;
+   unsigned int enabled_finger;
+   unsigned int repeats;
+   unsigned int max_fingers;
+
+   /* pressed timer */
+   Ecore_Timer *start_timer;
+   /* release timer */
+   Ecore_Timer *done_timer;
+   /* interval timer */
+   Ecore_Timer *interval_timer;
+};
+
 struct _E_Gesture_Event
 {
    E_Gesture_Event_Edge_Swipe edge_swipes;
+   E_Gesture_Event_Tap taps;
+
+   E_Gesture_Finger base_point[E_GESTURE_FINGER_MAX + 1];
 
    int num_pressed;
    Eina_Bool recognized_gesture;
@@ -171,7 +231,7 @@ struct _E_Gesture
       char *kbd_identifier;
       char *kbd_name;
       Ecore_Device *kbd_device;
-   }device;
+   } device;
 
    unsigned int grabbed_gesture;
    E_Gesture_Event gesture_events;
@@ -204,5 +264,9 @@ Eina_Bool e_gesture_is_touch_device(const Ecore_Device *dev);
 void e_gesture_device_keydev_set(char *option);
 
 void e_gesture_event_filter_enable(Eina_Bool enabled);
+
+/* Util functions */
+unsigned int e_gesture_util_tap_max_fingers_get(void);
+unsigned int e_gesture_util_tap_max_repeats_get(unsigned int);
 
 #endif

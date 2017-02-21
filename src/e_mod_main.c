@@ -291,9 +291,112 @@ notify:
    return;
 }
 
+static void
+_e_gesture_cb_grab_tap(struct wl_client *client,
+                   struct wl_resource *resource,
+                   uint32_t fingers, uint32_t repeats)
+{
+   E_Gesture_Event *gev;
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   GTINF("client %p requested to grab tap gesture (fingers: %d, repeats: %d)\n", client, fingers, repeats);
+
+   if (fingers > E_GESTURE_FINGER_MAX || repeats > E_GESTURE_TAP_REPEATS_MAX)
+     {
+        GTWRN("Not supported fingers /repeats bigger than their maximum values\n");
+        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
+        goto finish;
+     }
+
+   gev = &gesture->gesture_events;
+
+   if (gev->taps.fingers[fingers].repeats[repeats].client)
+     {
+        GTWRN("%d finger %d repeats is already grabbed by %p client\n", fingers, repeats, gev->taps.fingers[fingers].repeats[repeats].client);
+        ret = TIZEN_GESTURE_ERROR_GRABBED_ALREADY;
+        goto finish;
+     }
+
+   gev->taps.fingers[fingers].repeats[repeats].client = client;
+   gev->taps.fingers[fingers].repeats[repeats].res = resource;
+   gev->taps.fingers[fingers].enabled = EINA_TRUE;
+
+   if (gev->taps.max_fingers < fingers)
+     gev->taps.max_fingers = fingers;
+   if (gev->taps.fingers[fingers].max_repeats < repeats)
+     gev->taps.fingers[fingers].max_repeats = repeats;
+
+   gesture->grabbed_gesture |= TIZEN_GESTURE_TYPE_TAP;
+   gev->taps.state = E_GESTURE_TAP_STATE_READY;
+   gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
+   gesture->gesture_filter = E_GESTURE_TYPE_ALL & ~gesture->grabbed_gesture;
+
+finish:
+   tizen_gesture_send_tap_notify(resource, fingers, repeats, ret);
+}
+
+static void
+_e_gesture_cb_ungrab_tap(struct wl_client *client,
+                   struct wl_resource *resource,
+                   uint32_t fingers, uint32_t repeats)
+{
+   int i;
+   E_Gesture_Event *gev;
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   GTINF("client %p requested to ungrab tap gesture (fingers: %d, repeats: %d)\n", client, fingers, fingers);
+
+   if (fingers > E_GESTURE_FINGER_MAX || repeats > E_GESTURE_TAP_REPEATS_MAX)
+     {
+        GTWRN("Not supported fingers /repeats bigger than their maximum values\n");
+        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
+        goto finish;
+     }
+
+   gev = &gesture->gesture_events;
+
+   if (gev->taps.fingers[fingers].repeats[repeats].client == client)
+     {
+        gev->taps.fingers[fingers].repeats[repeats].client = NULL;
+        gev->taps.fingers[fingers].repeats[repeats].res = NULL;
+     }
+
+   gev->taps.fingers[fingers].enabled = EINA_FALSE;
+   for (i = 0; i < E_GESTURE_TAP_REPEATS_MAX; i++)
+     {
+        if (gev->taps.fingers[fingers].repeats[i].client)
+          {
+             gev->taps.fingers[fingers].enabled = EINA_TRUE;
+             break;
+          }
+     }
+
+   gesture->grabbed_gesture &= ~TIZEN_GESTURE_TYPE_TAP;
+   gev->taps.state = E_GESTURE_TAP_STATE_NONE;
+   gesture->event_state = E_GESTURE_EVENT_STATE_PROPAGATE;
+   for (i = 0; i < E_GESTURE_FINGER_MAX; i++)
+     {
+        if (gev->taps.fingers[i].enabled)
+          {
+             gesture->grabbed_gesture |= TIZEN_GESTURE_TYPE_TAP;
+             gev->taps.state = E_GESTURE_TAP_STATE_READY;
+             gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
+             break;
+          }
+     }
+
+   gev->taps.max_fingers = e_gesture_util_tap_max_fingers_get();
+   gev->taps.fingers[fingers].max_repeats = e_gesture_util_tap_max_repeats_get(fingers);
+
+finish:
+   tizen_gesture_send_tap_notify(resource, fingers, repeats, ret);
+}
+
 static const struct tizen_gesture_interface _e_gesture_implementation = {
    _e_gesture_cb_grab_edge_swipe,
-   _e_gesture_cb_ungrab_edge_swipe
+   _e_gesture_cb_ungrab_edge_swipe,
+   _e_gesture_cb_grab_tap,
+   _e_gesture_cb_ungrab_tap
 };
 
 /* tizen_gesture global object destroy function */

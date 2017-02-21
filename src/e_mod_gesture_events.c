@@ -431,6 +431,291 @@ _e_gesture_process_edge_swipe_up(Ecore_Event_Mouse_Button *ev)
    _e_gesture_edge_swipe_cancel();
 }
 
+unsigned int
+e_gesture_util_tap_max_fingers_get(void)
+{
+   E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+   int i;
+   unsigned int max = 0;
+
+   for (i = 0; i < E_GESTURE_FINGER_MAX +1; i++)
+     {
+        if (taps->fingers[i].enabled) max = i;
+     }
+
+   return max;
+}
+
+unsigned int
+e_gesture_util_tap_max_repeats_get(unsigned int fingers)
+{
+   E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+   int i;
+   unsigned int max = 0;
+
+   for (i = 0; i < E_GESTURE_TAP_REPEATS_MAX + 1; i++)
+     {
+        if (taps->fingers[fingers].repeats[i].client) max = i;
+     }
+
+   return max;
+}
+
+static void
+_e_gesture_tap_cancel(void)
+{
+   E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+
+   if (taps->start_timer)
+     {
+        ecore_timer_del(taps->start_timer);
+        taps->start_timer = NULL;
+     }
+   if (taps->done_timer)
+     {
+        ecore_timer_del(taps->done_timer);
+        taps->done_timer = NULL;
+     }
+   if (taps->interval_timer)
+     {
+        ecore_timer_del(taps->interval_timer);
+        taps->interval_timer = NULL;
+     }
+
+   taps->repeats = 0;
+   taps->enabled_finger = 0;
+   taps->state = E_GESTURE_TAP_STATE_READY;
+   gesture->gesture_filter |= TIZEN_GESTURE_TYPE_TAP;
+   _e_gesture_event_flush();
+   gesture->gesture_events.recognized_gesture &= ~TIZEN_GESTURE_TYPE_TAP;
+}
+
+static void
+_e_gesture_send_tap(int fingers, int repeats, struct wl_client *client, struct wl_resource *res)
+{
+   GTINF("Send Tap gesture. %d fingers %d repeats to client (%p)\n", fingers, repeats, client);
+   tizen_gesture_send_tap(res, TIZEN_GESTURE_MODE_DONE, fingers, repeats);
+   _e_gesture_event_drop();
+   gesture->gesture_events.recognized_gesture |= TIZEN_GESTURE_TYPE_TAP;
+
+   _e_gesture_tap_cancel();
+}
+
+static Eina_Bool
+_e_gesture_timer_tap_start(void *data)
+{
+   E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+
+   if (taps->fingers[taps->enabled_finger].enabled)
+     {
+        taps->state = E_GESTURE_TAP_STATE_PROCESS;
+     }
+   else
+     {
+        _e_gesture_tap_cancel();
+     }
+
+   taps->start_timer = NULL;
+   return ECORE_CALLBACK_CANCEL;
+}
+
+static Eina_Bool
+_e_gesture_timer_tap_done(void *data)
+{
+   E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+
+   if (gesture->gesture_events.num_pressed)
+     {
+        _e_gesture_tap_cancel();
+     }
+
+   taps->done_timer = NULL;
+   return ECORE_CALLBACK_CANCEL;
+}
+
+static Eina_Bool
+_e_gesture_timer_tap_interval(void *data)
+{
+   E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+
+   if (taps->fingers[taps->enabled_finger].repeats[taps->repeats].client)
+     {
+        _e_gesture_send_tap(taps->enabled_finger, taps->repeats,
+           taps->fingers[taps->enabled_finger].repeats[taps->repeats].client,
+           taps->fingers[taps->enabled_finger].repeats[taps->repeats].res);
+        gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
+        gesture->gesture_events.recognized_gesture &= ~TIZEN_GESTURE_TYPE_TAP;
+        gesture->gesture_filter = E_GESTURE_TYPE_ALL & ~gesture->grabbed_gesture;
+     }
+   else
+     {
+        _e_gesture_tap_cancel();
+
+        gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
+        gesture->gesture_filter = E_GESTURE_TYPE_ALL & ~gesture->grabbed_gesture;
+     }
+
+   taps->interval_timer = NULL;
+   return ECORE_CALLBACK_CANCEL;
+}
+
+static void
+_e_gesture_tap_start(void)
+{
+   E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+
+   taps->state = E_GESTURE_TAP_STATE_START;
+   if (!taps->start_timer)
+     {
+        taps->start_timer = ecore_timer_add(E_GESTURE_TAP_START_TIME, _e_gesture_timer_tap_start, NULL);
+     }
+   if (!taps->done_timer)
+     {
+        taps->done_timer = ecore_timer_add(E_GESTURE_TAP_DONE_TIME, _e_gesture_timer_tap_done, NULL);
+     }
+}
+
+static void
+_e_gesture_tap_done(void)
+{
+   E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+
+   if (taps->repeats >= E_GESTURE_TAP_REPEATS_MAX)
+     _e_gesture_tap_cancel();
+
+   if (!taps->fingers[taps->enabled_finger].enabled)
+      _e_gesture_tap_cancel();
+
+   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_TAP) &&
+       gesture->gesture_events.num_pressed == 0)
+     {
+        taps->state = E_GESTURE_TAP_STATE_WAIT;
+        taps->repeats++;
+        if (taps->done_timer)
+          {
+             ecore_timer_del(taps->done_timer);
+             taps->done_timer = NULL;
+          }
+        if (taps->repeats == taps->fingers[taps->enabled_finger].max_repeats)
+          {
+             ecore_timer_del(taps->interval_timer);
+             _e_gesture_timer_tap_interval(NULL);
+          }
+        else
+          {
+             if (!taps->interval_timer)
+               {
+                  taps->interval_timer = ecore_timer_add(E_GESTURE_TAP_INTERVAL_TIME, _e_gesture_timer_tap_interval, NULL);
+               }
+          }
+     }
+}
+
+static void
+_e_gesture_process_tap_down(Ecore_Event_Mouse_Button *ev)
+{
+   E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+
+   if (taps->enabled_finger < gesture->gesture_events.num_pressed)
+       taps->enabled_finger = gesture->gesture_events.num_pressed;
+
+   if (taps->enabled_finger > taps->max_fingers)
+     _e_gesture_tap_cancel();
+
+   switch (taps->state)
+     {
+        case E_GESTURE_TAP_STATE_NONE:
+           return;
+
+        case E_GESTURE_TAP_STATE_READY:
+           _e_gesture_tap_start();
+           break;
+
+        case E_GESTURE_TAP_STATE_START:
+           break;
+
+        case E_GESTURE_TAP_STATE_PROCESS:
+           _e_gesture_tap_cancel();
+           break;
+
+        case E_GESTURE_TAP_STATE_WAIT:
+           if (taps->interval_timer)
+             {
+                ecore_timer_del(taps->interval_timer);
+                taps->interval_timer = NULL;
+             }
+           _e_gesture_tap_start();
+           break;
+
+        case E_GESTURE_TAP_STATE_DONE:
+           break;
+
+        default:
+           break;
+     }
+}
+
+static void
+_e_gesture_process_tap_move(Ecore_Event_Mouse_Move *ev)
+{
+   int diff_x, diff_y;
+
+   diff_x = gesture->gesture_events.base_point[ev->multi.device].axis.x - ev->x;
+   diff_y = gesture->gesture_events.base_point[ev->multi.device].axis.y - ev->y;
+
+   if (ABS(diff_x) > E_GESTURE_TAP_MOVING_LANGE ||
+       ABS(diff_y) > E_GESTURE_TAP_MOVING_LANGE)
+     {
+        GTDBG("%d finger moving too large diff: (%d, %d)\n", ev->multi.device, diff_x, diff_y);
+        _e_gesture_tap_cancel();
+     }
+}
+
+static void
+_e_gesture_process_tap_up(Ecore_Event_Mouse_Button *ev)
+{
+   E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+
+   switch (taps->state)
+     {
+        case E_GESTURE_TAP_STATE_NONE:
+           return;
+
+        case E_GESTURE_TAP_STATE_READY:
+           _e_gesture_tap_cancel();
+           break;
+
+        case E_GESTURE_TAP_STATE_START:
+           taps->state = E_GESTURE_TAP_STATE_PROCESS;
+           if (taps->start_timer)
+             {
+                ecore_timer_del(taps->start_timer);
+                taps->start_timer = NULL;
+             }
+           _e_gesture_tap_done();
+           break;
+
+        case E_GESTURE_TAP_STATE_PROCESS:
+           _e_gesture_tap_done();
+           break;
+
+        case E_GESTURE_TAP_STATE_WAIT:
+           if (taps->interval_timer)
+             {
+                ecore_timer_del(taps->interval_timer);
+                taps->interval_timer = NULL;
+             }
+           _e_gesture_tap_start();
+           break;
+
+        case E_GESTURE_TAP_STATE_DONE:
+           break;
+
+        default:
+           break;
+     }
+}
+
 static E_Gesture_Event_State
 _e_gesture_process_mouse_button_down(void *event)
 {
@@ -449,6 +734,10 @@ _e_gesture_process_mouse_button_down(void *event)
         return E_GESTURE_EVENT_STATE_PROPAGATE;
      }
 
+   gesture->gesture_events.base_point[ev->multi.device].pressed = EINA_TRUE;
+   gesture->gesture_events.base_point[ev->multi.device].axis.x = ev->x;
+   gesture->gesture_events.base_point[ev->multi.device].axis.y = ev->y;
+
    if (gesture->gesture_events.recognized_gesture)
      {
         return E_GESTURE_EVENT_STATE_IGNORE;
@@ -465,6 +754,10 @@ _e_gesture_process_mouse_button_down(void *event)
    if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_EDGE_SWIPE))
      {
         _e_gesture_process_edge_swipe_down(ev);
+     }
+   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_TAP))
+     {
+        _e_gesture_process_tap_down(ev);
      }
 
    return gesture->event_state;
@@ -483,6 +776,23 @@ _e_gesture_process_mouse_button_up(void *event)
      {
         return E_GESTURE_EVENT_STATE_PROPAGATE;
      }
+   if (ev->multi.device > E_GESTURE_FINGER_MAX)
+     {
+        return E_GESTURE_EVENT_STATE_PROPAGATE;
+     }
+
+   gesture->gesture_events.base_point[ev->multi.device].pressed = EINA_FALSE;
+   gesture->gesture_events.base_point[ev->multi.device].axis.x = 0;
+   gesture->gesture_events.base_point[ev->multi.device].axis.y = 0;
+
+   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_EDGE_SWIPE))
+     {
+        _e_gesture_process_edge_swipe_up(ev);
+     }
+   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_TAP))
+     {
+        _e_gesture_process_tap_up(ev);
+     }
 
    if (gesture->gesture_events.recognized_gesture)
      {
@@ -491,11 +801,6 @@ _e_gesture_process_mouse_button_up(void *event)
              gesture->gesture_events.recognized_gesture = 0x0;
           }
         return E_GESTURE_EVENT_STATE_IGNORE;
-     }
-
-   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_EDGE_SWIPE))
-     {
-        _e_gesture_process_edge_swipe_up(ev);
      }
 
    return gesture->event_state;
@@ -511,6 +816,10 @@ _e_gesture_process_mouse_move(void *event)
      {
         return E_GESTURE_EVENT_STATE_PROPAGATE;
      }
+   if (ev->multi.device > E_GESTURE_FINGER_MAX)
+     {
+        return E_GESTURE_EVENT_STATE_PROPAGATE;
+     }
    if (gesture->gesture_events.num_pressed == 0)
      {
         return gesture->event_state;
@@ -518,6 +827,10 @@ _e_gesture_process_mouse_move(void *event)
    if (!gesture->grabbed_gesture)
      {
         return E_GESTURE_EVENT_STATE_PROPAGATE;
+     }
+   if (gesture->gesture_events.base_point[ev->multi.device].pressed != EINA_TRUE)
+     {
+        return gesture->event_state;
      }
    if (gesture->gesture_events.recognized_gesture)
      {
@@ -527,6 +840,10 @@ _e_gesture_process_mouse_move(void *event)
    if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_EDGE_SWIPE))
      {
         _e_gesture_process_edge_swipe_move(ev);
+     }
+   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_TAP))
+     {
+        _e_gesture_process_tap_move(ev);
      }
 
    return gesture->event_state;
@@ -602,9 +919,10 @@ e_gesture_process_events(void *event, int type)
    if (gesture->gesture_events.num_pressed == 0&&
        type == ECORE_EVENT_MOUSE_BUTTON_UP)
      {
-        if ((gesture->grabbed_gesture & TIZEN_GESTURE_TYPE_EDGE_SWIPE) &&
-            gesture->gesture_events.edge_swipes.event_keep)
-        gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
+        if (gesture->grabbed_gesture & TIZEN_GESTURE_TYPE_TAP ||
+             ((gesture->grabbed_gesture & TIZEN_GESTURE_TYPE_EDGE_SWIPE) &&
+              gesture->gesture_events.edge_swipes.event_keep))
+          gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
         gesture->gesture_filter = E_GESTURE_TYPE_ALL & ~gesture->grabbed_gesture;
      }
 
