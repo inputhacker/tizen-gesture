@@ -173,15 +173,6 @@ struct _E_Gesture_Event_Edge_Swipe_Finger
    E_Gesture_Event_Edge_Swipe_Finger_Edge edge[E_GESTURE_EDGE_MAX + 1];
 };
 
-struct _E_Gesture_Grabbed_Client
-{
-   struct wl_client *client;
-   struct wl_listener *destroy_listener;
-
-   E_Gesture_Event_Edge_Swipe_Finger edge_swipe_fingers[E_GESTURE_FINGER_MAX + 2];
-};
-
-
 struct _E_Gesture_Event_Edge_Swipe
 {
    E_Gesture_Event_Edge_Swipe_Finger fingers[E_GESTURE_FINGER_MAX + 2];
@@ -251,6 +242,18 @@ struct _E_Gesture_Event_Pinch
 
    Ecore_Timer *start_timer;
    Ecore_Timer *move_timer;
+};
+
+struct _E_Gesture_Grabbed_Client
+{
+   struct wl_client *client;
+   struct wl_listener *destroy_listener;
+   unsigned int grabbed_gesture;
+
+   E_Gesture_Event_Edge_Swipe_Finger edge_swipe_fingers[E_GESTURE_FINGER_MAX + 2];
+   E_Gesture_Event_Tap_Finger tap_fingers[E_GESTURE_FINGER_MAX + 2];
+   E_Gesture_Event_Client pan_fingers[E_GESTURE_FINGER_MAX + 2];
+   E_Gesture_Event_Client pinch_fingers[E_GESTURE_FINGER_MAX + 2];
 };
 
 struct _E_Gesture_Event
