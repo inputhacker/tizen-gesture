@@ -173,6 +173,7 @@ _e_gesture_cb_grab_edge_swipe(struct wl_client *client,
    gesture->grabbed_gesture |= TIZEN_GESTURE_TYPE_EDGE_SWIPE;
    gev->edge_swipes.fingers[fingers].enabled = EINA_TRUE;
    if (gev->edge_swipes.event_keep) gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
+   gev->edge_swipes.enabled_edge |= grabbed_edge;
 
    if (!grabbed_edge)
      tizen_gesture_send_grab_edge_swipe_notify(resource, fingers, edge, TIZEN_GESTURE_ERROR_NONE);
@@ -197,7 +198,7 @@ _e_gesture_cb_ungrab_edge_swipe(struct wl_client *client,
      {
         GTWRN("Do not support %d fingers (max: %d)\n", fingers, E_GESTURE_FINGER_MAX);
         ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
-        goto finish;
+        goto notify;
      }
 
    gev = &gesture->gesture_events;
@@ -274,6 +275,20 @@ _e_gesture_cb_ungrab_edge_swipe(struct wl_client *client,
      }
 
 finish:
+   gev->edge_swipes.enabled_edge &= ~edge;
+   for (i = 0; i < E_GESTURE_FINGER_MAX+1; i++)
+     {
+        for (j = 1; j < E_GESTURE_EDGE_MAX+1; j++)
+          {
+             if (gev->edge_swipes.fingers[i].edge[j].client)
+               {
+                  gev->edge_swipes.enabled_edge |= (1 <<  (j - 1));
+               }
+          }
+        if (gev->edge_swipes.enabled_edge == E_GESTURE_EDGE_ALL) break;
+     }
+
+notify:
    tizen_gesture_send_grab_edge_swipe_notify(resouce, fingers, edge, ret);
    return;
 }

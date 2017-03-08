@@ -316,18 +316,22 @@ _e_gesture_process_edge_swipe_down(Ecore_Event_Mouse_Button *ev)
           edge_swipes->edge = E_GESTURE_EDGE_RIGHT;
         else if (ev->x > e_comp->w - conf->edge_swipe.area_offset)
           edge_swipes->edge = E_GESTURE_EDGE_LEFT;
-        else
-          {
-             if (edge_swipes->event_keep)
-               _e_gesture_event_flush();
-             _e_gesture_edge_swipe_cancel();
-          }
+
+        if (!((1 << (edge_swipes->edge - 1)) & edge_swipes->enabled_edge))
+          edge_swipes->edge = E_GESTURE_EDGE_NONE;
+
         if (edge_swipes->edge != E_GESTURE_EDGE_NONE)
           {
              edge_swipes->fingers[idx].start.x = ev->x;
              edge_swipes->fingers[idx].start.y = ev->y;
              edge_swipes->start_timer = ecore_timer_add(conf->edge_swipe.time_begin, _e_gesture_timer_edge_swipe_start, NULL);
              edge_swipes->done_timer = ecore_timer_add(conf->edge_swipe.time_done, _e_gesture_timer_edge_swipe_done, NULL);
+          }
+        else
+          {
+             if (edge_swipes->event_keep)
+               _e_gesture_event_flush();
+             _e_gesture_edge_swipe_cancel();
           }
      }
    else

@@ -51,6 +51,7 @@ typedef enum _E_Gesture_Event_State E_Gesture_Event_State;
 extern E_GesturePtr gesture;
 
 #define E_GESTURE_EDGE_MAX 4
+#define E_GESTURE_EDGE_ALL (TIZEN_GESTURE_EDGE_TOP | TIZEN_GESTURE_EDGE_RIGHT | TIZEN_GESTURE_EDGE_BOTTOM | TIZEN_GESTURE_EDGE_LEFT)
 
 enum _E_Gesture_Edge
 {
@@ -135,6 +136,8 @@ struct _E_Gesture_Event_Edge_Swipe
    unsigned int back_keycode;
 
    unsigned int enabled_finger;
+   unsigned int enabled_edge;
+
    Ecore_Timer *start_timer;
    Ecore_Timer *done_timer;
 
