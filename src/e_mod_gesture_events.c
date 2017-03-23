@@ -176,6 +176,7 @@ _e_gesture_send_back_key(Eina_Bool pressed)
    ev->same_screen = 1;
    ev->keycode = conf->edge_swipe.back_key;
    ev->dev = gesture->device.kbd_device;
+   ev->window = e_comp->ee_win;
 
    if (pressed)
      ecore_event_add(ECORE_EVENT_KEY_DOWN, ev, _e_gesture_keyevent_free, NULL);
