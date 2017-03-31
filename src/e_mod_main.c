@@ -498,6 +498,7 @@ _e_gesture_init(E_Module *m)
         gesture->gesture_events.edge_swipes.fingers[1].enabled = EINA_TRUE;
         gesture->gesture_events.edge_swipes.fingers[1].edge[E_GESTURE_EDGE_TOP].client = (void *)0x1;
         gesture->gesture_events.edge_swipes.fingers[1].edge[E_GESTURE_EDGE_TOP].res = (void *)0x1;
+        gesture->gesture_events.edge_swipes.enabled_edge |= TIZEN_GESTURE_EDGE_TOP;
         if (gesture->gesture_events.edge_swipes.event_keep)
             {
                gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
