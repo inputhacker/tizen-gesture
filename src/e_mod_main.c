@@ -8,8 +8,6 @@ E_API E_Module_Api e_modapi = { E_MODULE_API_VERSION, "Gesture Module of Window 
 
 static E_Gesture_Config_Data *_e_gesture_init(E_Module *m);
 static void _e_gesture_init_handlers(void);
-
-
 static void _e_gesture_wl_client_cb_destroy(struct wl_listener *l, void *data);
 
 static void
@@ -500,9 +498,9 @@ _e_gesture_init(E_Module *m)
         gesture->gesture_events.edge_swipes.fingers[1].edge[E_GESTURE_EDGE_TOP].res = (void *)0x1;
         gesture->gesture_events.edge_swipes.enabled_edge |= TIZEN_GESTURE_EDGE_TOP;
         if (gesture->gesture_events.edge_swipes.event_keep)
-            {
-               gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
-            }
+          {
+             gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
+          }
      }
 
    e_gesture_device_keydev_set(gesture->config->conf->key_device_name);
