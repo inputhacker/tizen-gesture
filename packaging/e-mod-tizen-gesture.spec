@@ -2,7 +2,7 @@
 %bcond_with wayland
 
 Name: e-mod-tizen-gesture
-Version: 0.1.7
+Version: 0.1.8
 Release: 1
 Summary: The Enlightenment Gesture Module for Tizen
 URL: http://www.enlightenment.org
