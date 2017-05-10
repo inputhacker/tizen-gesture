@@ -473,13 +473,13 @@ _e_gesture_pan_cancel(void)
         pans->move_timer = NULL;
      }
 
-   if (pans->state == E_GESTURE_PAN_STATE_MOVING)
+   if (pans->state == E_GESTURE_PANPINCH_STATE_MOVING)
      _e_gesture_pan_send(TIZEN_GESTURE_MODE_END, pans->num_pan_fingers, 0, 0,
                          pans->fingers[pans->num_pan_fingers].res,
                          pans->fingers[pans->num_pan_fingers].client);
 
    gesture->gesture_filter |= TIZEN_GESTURE_TYPE_PAN;
-   pans->state = E_GESTURE_PAN_STATE_DONE;
+   pans->state = E_GESTURE_PANPINCH_STATE_DONE;
 }
 
 static void
@@ -501,6 +501,50 @@ _e_gesture_util_center_axis_get(int num_finger, int *x, int *y)
    *y = calc_y;
 }
 
+static int
+_e_gesture_util_distance_get(int x1, int y1, int x2, int y2)
+{
+   int distance;
+
+   distance = sqrt(((x2 - x1) * (x2 - x1)) + ((y2 - y1) * (y2 - y1)));
+
+   return distance;
+}
+
+static int
+_e_gesture_util_distances_get(int num_finger)
+{
+   int i;
+   int cx = 0, cy = 0, distance = 0;
+
+   _e_gesture_util_center_axis_get(num_finger, &cx, &cy);
+
+   for (i = 1; i <= num_finger; i++)
+     {
+        distance +=  _e_gesture_util_distance_get(cx, cy,
+                       gesture->gesture_events.base_point[i].axis.x,
+                       gesture->gesture_events.base_point[i].axis.y);
+     }
+
+   return distance;
+}
+
+static double
+_e_gesture_util_angle_get(int x1, int y1, int x2, int y2)
+{
+   double angle, xx, yy;
+
+   xx = fabs(x2 - x1);
+   yy = fabs(y2 - y1);
+
+   angle = atan2(yy, xx);
+   if ((x1 > x2) && (y1 > y2)) angle = angle + M_PI_2;
+   else if ((x2 > x1) && (y2 > y1)) angle = angle + M_PI_2;
+
+   angle = RAD2DEG(angle);
+   return angle;
+}
+
 static Eina_Bool
 _e_gesture_timer_pan_start(void *data)
 {
@@ -517,7 +561,7 @@ _e_gesture_timer_pan_start(void *data)
           }
         pans->center_point.x = pans->start_point.x = (int)(pans->start_point.x / num_pressed);
         pans->center_point.y = pans->start_point.y = (int)(pans->start_point.y / num_pressed);
-        pans->state = E_GESTURE_PAN_STATE_START;
+        pans->state = E_GESTURE_PANPINCH_STATE_START;
      }
    else
      {
@@ -532,12 +576,13 @@ _e_gesture_process_pan_down(Ecore_Event_Mouse_Button *ev)
    E_Gesture_Event_Pan *pans = &gesture->gesture_events.pans;
 
    if (gesture->gesture_events.recognized_gesture &&
-       !((gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PAN)))
+       !((gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PAN) ||
+       (gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PINCH)))
      _e_gesture_pan_cancel();
 
    if (gesture->gesture_events.num_pressed == 1)
      {
-        pans->state = E_GESTURE_PAN_STATE_READY;
+        pans->state = E_GESTURE_PANPINCH_STATE_READY;
         if (pans->start_timer) ecore_timer_del(pans->start_timer);
         pans->start_timer = ecore_timer_add(E_GESTURE_PAN_START_TIME, _e_gesture_timer_pan_start, NULL);
      }
@@ -551,12 +596,13 @@ _e_gesture_process_pan_move(Ecore_Event_Mouse_Move *ev)
    int idx, diff_x, diff_y, mode;
 
    if (gesture->gesture_events.recognized_gesture &&
-       !((gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PAN)))
+       !((gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PAN) ||
+       (gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PINCH)))
      _e_gesture_pan_cancel();
 
    idx = gesture->gesture_events.num_pressed;
    if (idx <= 0) return;
-   if (pans->state == E_GESTURE_PAN_STATE_READY) return;
+   if (pans->state == E_GESTURE_PANPINCH_STATE_READY) return;
 
    _e_gesture_util_center_axis_get(gesture->gesture_events.num_pressed, &cur_point.x, &cur_point.y);
 
@@ -567,12 +613,12 @@ _e_gesture_process_pan_move(Ecore_Event_Mouse_Move *ev)
      {
         switch (pans->state)
           {
-             case E_GESTURE_PAN_STATE_START:
+             case E_GESTURE_PANPINCH_STATE_START:
                 mode = TIZEN_GESTURE_MODE_BEGIN;
-                pans->state = E_GESTURE_PAN_STATE_MOVING;
+                pans->state = E_GESTURE_PANPINCH_STATE_MOVING;
                 pans->num_pan_fingers = idx;
                 break;
-             case E_GESTURE_PAN_STATE_MOVING:
+             case E_GESTURE_PANPINCH_STATE_MOVING:
                 mode = TIZEN_GESTURE_MODE_UPDATE;
                 break;
              default:
@@ -594,6 +640,144 @@ _e_gesture_process_pan_up(Ecore_Event_Mouse_Button *ev)
 {
    _e_gesture_pan_cancel();
 }
+
+static void
+_e_gesture_pinch_send(int mode, int fingers, int distance, int angle, int cx, int cy, struct wl_resource *res, struct wl_client *client)
+{
+   Ecore_Event_Mouse_Button *ev_cancel;
+
+   if (mode == TIZEN_GESTURE_MODE_BEGIN)
+     {
+        ev_cancel = E_NEW(Ecore_Event_Mouse_Button, 1);
+        EINA_SAFETY_ON_NULL_RETURN(ev_cancel);
+
+        ev_cancel->timestamp = (int)(ecore_time_get()*1000);
+        ev_cancel->same_screen = 1;
+
+        ecore_event_add(ECORE_EVENT_MOUSE_BUTTON_CANCEL, ev_cancel, NULL, NULL);
+     }
+
+   GTINF("Send pinch gesture (fingers: %d, distance: %d, angle: %d, cx: %d, cy: %d) to client: %p, mode: %d\n", fingers, distance, angle, cx, cy, client, mode);
+
+   tizen_gesture_send_pinch(res, mode, fingers, distance, angle, cx, cy);
+
+   gesture->gesture_events.recognized_gesture |= TIZEN_GESTURE_TYPE_PINCH;
+}
+
+static void
+_e_gesture_pinch_cancel(void)
+{
+   E_Gesture_Event_Pinch *pinchs = &gesture->gesture_events.pinchs;
+
+   if (pinchs->start_timer)
+     {
+        ecore_timer_del(pinchs->start_timer);
+        pinchs->start_timer = NULL;
+     }
+   if (pinchs->move_timer)
+     {
+        ecore_timer_del(pinchs->move_timer);
+        pinchs->move_timer = NULL;
+     }
+
+   if (pinchs->state == E_GESTURE_PANPINCH_STATE_MOVING)
+     _e_gesture_pinch_send(TIZEN_GESTURE_MODE_END, pinchs->num_pinch_fingers, 0, 0, 0, 0,
+                           pinchs->fingers[pinchs->num_pinch_fingers].res,
+                           pinchs->fingers[pinchs->num_pinch_fingers].client);
+
+   gesture->gesture_filter |= TIZEN_GESTURE_TYPE_PINCH;
+   pinchs->state = E_GESTURE_PANPINCH_STATE_DONE;
+}
+
+static Eina_Bool
+_e_gesture_timer_pinch_start(void *data)
+{
+   E_Gesture_Event_Pinch *pinch = &gesture->gesture_events.pinchs;
+   int num_pressed = gesture->gesture_events.num_pressed;
+
+   if (pinch->fingers[num_pressed].client)
+     {
+        pinch->distance = _e_gesture_util_distances_get(num_pressed);
+        pinch->state = E_GESTURE_PANPINCH_STATE_START;
+     }
+   else
+     {
+        _e_gesture_pinch_cancel();
+     }
+   return ECORE_CALLBACK_CANCEL;
+}
+
+static void
+_e_gesture_process_pinch_down(Ecore_Event_Mouse_Button *ev)
+{
+   E_Gesture_Event_Pinch *pinch = &gesture->gesture_events.pinchs;
+
+   if (gesture->gesture_events.recognized_gesture &&
+       !((gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PAN) ||
+       (gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PINCH)))
+     _e_gesture_pinch_cancel();
+
+   if (gesture->gesture_events.num_pressed == 1)
+     {
+        pinch->state = E_GESTURE_PANPINCH_STATE_READY;
+        if (pinch->start_timer) ecore_timer_del(pinch->start_timer);
+        pinch->start_timer = ecore_timer_add(E_GESTURE_PAN_START_TIME, _e_gesture_timer_pinch_start, NULL);
+     }
+}
+
+static void
+_e_gesture_process_pinch_move(Ecore_Event_Mouse_Move *ev)
+{
+   E_Gesture_Event_Pinch *pinch = &gesture->gesture_events.pinchs;
+   int idx, current_distance, mode, diff, angle, cx = 0, cy = 0;
+
+   if (gesture->gesture_events.recognized_gesture &&
+       !((gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PAN) ||
+       (gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PINCH)))
+     _e_gesture_pan_cancel();
+
+   idx = gesture->gesture_events.num_pressed;
+   if (idx <= 0) return;
+   if (pinch->state == E_GESTURE_PANPINCH_STATE_READY) return;
+
+   current_distance = _e_gesture_util_distances_get(idx);
+   diff = current_distance - pinch->distance;
+
+   if (ABS(diff) > E_GESTURE_PINCH_MOVING_DISTANCE_RANGE)
+     {
+        pinch->distance = current_distance;
+        switch (pinch->state)
+          {
+             case E_GESTURE_PANPINCH_STATE_START:
+                mode = TIZEN_GESTURE_MODE_BEGIN;
+                pinch->state = E_GESTURE_PANPINCH_STATE_MOVING;
+                pinch->num_pinch_fingers = idx;
+                break;
+             case E_GESTURE_PANPINCH_STATE_MOVING:
+                mode = TIZEN_GESTURE_MODE_UPDATE;
+                break;
+             default:
+                return;
+          }
+
+        if (idx == 2) angle = _e_gesture_util_angle_get(gesture->gesture_events.base_point[1].axis.x,
+                                                        gesture->gesture_events.base_point[1].axis.y,
+                                                        gesture->gesture_events.base_point[2].axis.x,
+                                                        gesture->gesture_events.base_point[2].axis.y);
+        else angle = 0;
+
+        _e_gesture_util_center_axis_get(idx, &cx, &cy);
+
+        _e_gesture_pinch_send(mode, idx, pinch->distance, angle, cx, cy, pinch->fingers[idx].res, pinch->fingers[idx].client);
+     }
+}
+
+static void
+_e_gesture_process_pinch_up(Ecore_Event_Mouse_Button *ev)
+{
+   _e_gesture_pinch_cancel();
+}
+
 
 unsigned int
 e_gesture_util_tap_max_fingers_get(void)
@@ -932,6 +1116,10 @@ _e_gesture_process_mouse_button_down(void *event)
      {
         _e_gesture_process_pan_down(ev);
      }
+   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_PINCH))
+     {
+        _e_gesture_process_pinch_down(ev);
+     }
    if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_TAP))
      {
         _e_gesture_process_tap_down(ev);
@@ -969,6 +1157,10 @@ _e_gesture_process_mouse_button_up(void *event)
    if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_PAN))
      {
         _e_gesture_process_pan_up(ev);
+     }
+   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_PINCH))
+     {
+        _e_gesture_process_pinch_up(ev);
      }
    if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_TAP))
      {
@@ -1024,6 +1216,10 @@ _e_gesture_process_mouse_move(void *event)
    if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_PAN))
      {
         _e_gesture_process_pan_move(ev);
+     }
+   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_PINCH))
+     {
+        _e_gesture_process_pinch_move(ev);
      }
    if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_TAP))
      {

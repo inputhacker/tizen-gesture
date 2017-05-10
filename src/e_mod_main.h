@@ -39,6 +39,8 @@
 #define E_GESTURE_PAN_START_TIME 0.05
 #define E_GESTURE_PAN_MOVING_RANGE 15
 
+#define E_GESTURE_PINCH_MOVING_DISTANCE_RANGE 15
+
 #define ABS(x) (((x)>0)?(x):-(x))
 
 #define RAD2DEG(x) ((x) * 57.295779513)
@@ -59,6 +61,8 @@ typedef struct _E_Gesture_Event_Tap E_Gesture_Event_Tap;
 
 typedef struct _E_Gesture_Event_Pan E_Gesture_Event_Pan;
 
+typedef struct _E_Gesture_Event_Pinch E_Gesture_Event_Pinch;
+
 typedef struct _Coords Coords;
 typedef struct _E_Gesture_Finger E_Gesture_Finger;
 typedef struct _E_Gesture_Event_Info E_Gesture_Event_Info;
@@ -67,7 +71,7 @@ typedef struct _E_Gesture_Event_Client E_Gesture_Event_Client;
 typedef enum _E_Gesture_Edge E_Gesture_Edge;
 typedef enum _E_Gesture_Event_State E_Gesture_Event_State;
 typedef enum _E_Gesture_Tap_State E_Gesture_Tap_State;
-typedef enum _E_Gesture_Pan_State E_Gesture_Pan_State;
+typedef enum _E_Gesture_PanPinch_State E_Gesture_PanPinch_State;
 
 extern E_GesturePtr gesture;
 
@@ -100,13 +104,13 @@ enum _E_Gesture_Tap_State
    E_GESTURE_TAP_STATE_DONE
 };
 
-enum _E_Gesture_Pan_State
+enum _E_Gesture_PanPinch_State
 {
-   E_GESTURE_PAN_STATE_NONE,
-   E_GESTURE_PAN_STATE_READY,
-   E_GESTURE_PAN_STATE_START,
-   E_GESTURE_PAN_STATE_MOVING,
-   E_GESTURE_PAN_STATE_DONE
+   E_GESTURE_PANPINCH_STATE_NONE,
+   E_GESTURE_PANPINCH_STATE_READY,
+   E_GESTURE_PANPINCH_STATE_START,
+   E_GESTURE_PANPINCH_STATE_MOVING,
+   E_GESTURE_PANPINCH_STATE_DONE
 };
 
 struct _Coords
@@ -228,11 +232,22 @@ struct _E_Gesture_Event_Tap
 struct _E_Gesture_Event_Pan
 {
    E_Gesture_Event_Client fingers[E_GESTURE_FINGER_MAX + 2];
-   E_Gesture_Pan_State state;
+   E_Gesture_PanPinch_State state;
    Coords start_point;
    Coords prev_point;
    Coords center_point;
    int num_pan_fingers;
+
+   Ecore_Timer *start_timer;
+   Ecore_Timer *move_timer;
+};
+
+struct _E_Gesture_Event_Pinch
+{
+   E_Gesture_Event_Client fingers[E_GESTURE_FINGER_MAX + 2];
+   E_Gesture_PanPinch_State state;
+   int distance;
+   int num_pinch_fingers;
 
    Ecore_Timer *start_timer;
    Ecore_Timer *move_timer;
@@ -243,6 +258,7 @@ struct _E_Gesture_Event
    E_Gesture_Event_Edge_Swipe edge_swipes;
    E_Gesture_Event_Tap taps;
    E_Gesture_Event_Pan pans;
+   E_Gesture_Event_Pinch pinchs;
 
    E_Gesture_Finger base_point[E_GESTURE_FINGER_MAX + 2];
 
