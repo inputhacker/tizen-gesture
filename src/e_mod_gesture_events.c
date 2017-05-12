@@ -299,6 +299,9 @@ _e_gesture_process_edge_swipe_down(Ecore_Event_Mouse_Button *ev)
    int i;
    unsigned int idx = ev->multi.device+1;
 
+   if (gesture->gesture_events.recognized_gesture)
+     _e_gesture_edge_swipe_cancel();
+
    if (gesture->gesture_events.num_pressed == 1)
      {
         for (i = 0; i < E_GESTURE_FINGER_MAX+1; i++)
@@ -777,6 +780,9 @@ _e_gesture_process_tap_down(Ecore_Event_Mouse_Button *ev)
 {
    E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
 
+   if (gesture->gesture_events.recognized_gesture)
+     _e_gesture_tap_cancel();
+
    if (taps->enabled_finger < gesture->gesture_events.num_pressed)
        taps->enabled_finger = gesture->gesture_events.num_pressed;
 
@@ -821,6 +827,9 @@ _e_gesture_process_tap_move(Ecore_Event_Mouse_Move *ev)
 {
    int diff_x, diff_y;
 
+   if (gesture->gesture_events.recognized_gesture)
+     _e_gesture_tap_cancel();
+
    diff_x = gesture->gesture_events.base_point[ev->multi.device + 1].axis.x - ev->x;
    diff_y = gesture->gesture_events.base_point[ev->multi.device + 1].axis.y - ev->y;
 
@@ -836,6 +845,9 @@ static void
 _e_gesture_process_tap_up(Ecore_Event_Mouse_Button *ev)
 {
    E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+
+   if (gesture->gesture_events.recognized_gesture)
+     _e_gesture_tap_cancel();
 
    switch (taps->state)
      {
