@@ -824,8 +824,8 @@ _e_gesture_process_tap_move(Ecore_Event_Mouse_Move *ev)
    diff_x = gesture->gesture_events.base_point[ev->multi.device].axis.x - ev->x;
    diff_y = gesture->gesture_events.base_point[ev->multi.device].axis.y - ev->y;
 
-   if (ABS(diff_x) > E_GESTURE_TAP_MOVING_LANGE ||
-       ABS(diff_y) > E_GESTURE_TAP_MOVING_LANGE)
+   if (ABS(diff_x) > E_GESTURE_TAP_MOVING_RANGE ||
+       ABS(diff_y) > E_GESTURE_TAP_MOVING_RANGE)
      {
         GTDBG("%d finger moving too large diff: (%d, %d)\n", ev->multi.device, diff_x, diff_y);
         _e_gesture_tap_cancel();
