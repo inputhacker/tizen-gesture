@@ -821,8 +821,8 @@ _e_gesture_process_tap_move(Ecore_Event_Mouse_Move *ev)
 {
    int diff_x, diff_y;
 
-   diff_x = gesture->gesture_events.base_point[ev->multi.device].axis.x - ev->x;
-   diff_y = gesture->gesture_events.base_point[ev->multi.device].axis.y - ev->y;
+   diff_x = gesture->gesture_events.base_point[ev->multi.device + 1].axis.x - ev->x;
+   diff_y = gesture->gesture_events.base_point[ev->multi.device + 1].axis.y - ev->y;
 
    if (ABS(diff_x) > E_GESTURE_TAP_MOVING_RANGE ||
        ABS(diff_y) > E_GESTURE_TAP_MOVING_RANGE)
@@ -895,9 +895,9 @@ _e_gesture_process_mouse_button_down(void *event)
         return E_GESTURE_EVENT_STATE_PROPAGATE;
      }
 
-   gesture->gesture_events.base_point[ev->multi.device].pressed = EINA_TRUE;
-   gesture->gesture_events.base_point[ev->multi.device].axis.x = ev->x;
-   gesture->gesture_events.base_point[ev->multi.device].axis.y = ev->y;
+   gesture->gesture_events.base_point[ev->multi.device + 1].pressed = EINA_TRUE;
+   gesture->gesture_events.base_point[ev->multi.device + 1].axis.x = ev->x;
+   gesture->gesture_events.base_point[ev->multi.device + 1].axis.y = ev->y;
 
    if (gesture->gesture_events.recognized_gesture)
      {
@@ -946,9 +946,9 @@ _e_gesture_process_mouse_button_up(void *event)
         return E_GESTURE_EVENT_STATE_PROPAGATE;
      }
 
-   gesture->gesture_events.base_point[ev->multi.device].pressed = EINA_FALSE;
-   gesture->gesture_events.base_point[ev->multi.device].axis.x = 0;
-   gesture->gesture_events.base_point[ev->multi.device].axis.y = 0;
+   gesture->gesture_events.base_point[ev->multi.device + 1].pressed = EINA_FALSE;
+   gesture->gesture_events.base_point[ev->multi.device + 1].axis.x = 0;
+   gesture->gesture_events.base_point[ev->multi.device + 1].axis.y = 0;
 
    if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_EDGE_SWIPE))
      {
@@ -998,12 +998,12 @@ _e_gesture_process_mouse_move(void *event)
         return E_GESTURE_EVENT_STATE_PROPAGATE;
      }
 
-   if (gesture->gesture_events.base_point[ev->multi.device].pressed != EINA_TRUE)
+   if (gesture->gesture_events.base_point[ev->multi.device + 1].pressed != EINA_TRUE)
      {
         return gesture->event_state;
      }
-   gesture->gesture_events.base_point[ev->multi.device].axis.x = ev->x;
-   gesture->gesture_events.base_point[ev->multi.device].axis.y = ev->y;
+   gesture->gesture_events.base_point[ev->multi.device + 1].axis.x = ev->x;
+   gesture->gesture_events.base_point[ev->multi.device + 1].axis.y = ev->y;
 
    if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_EDGE_SWIPE))
      {
