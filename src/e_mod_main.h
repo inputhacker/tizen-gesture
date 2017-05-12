@@ -166,7 +166,7 @@ struct _E_Gesture_Event_Edge_Swipe_Finger
 {
    Coords start;
    Eina_Bool enabled;
-   E_Gesture_Event_Edge_Swipe_Finger_Edge edge[E_GESTURE_EDGE_MAX+1];
+   E_Gesture_Event_Edge_Swipe_Finger_Edge edge[E_GESTURE_EDGE_MAX + 1];
 };
 
 struct _E_Gesture_Grabbed_Client
@@ -174,13 +174,13 @@ struct _E_Gesture_Grabbed_Client
    struct wl_client *client;
    struct wl_listener *destroy_listener;
 
-   E_Gesture_Event_Edge_Swipe_Finger edge_swipe_fingers[E_GESTURE_FINGER_MAX+2];
+   E_Gesture_Event_Edge_Swipe_Finger edge_swipe_fingers[E_GESTURE_FINGER_MAX + 2];
 };
 
 
 struct _E_Gesture_Event_Edge_Swipe
 {
-   E_Gesture_Event_Edge_Swipe_Finger fingers[E_GESTURE_FINGER_MAX+2];
+   E_Gesture_Event_Edge_Swipe_Finger fingers[E_GESTURE_FINGER_MAX + 2];
 
    unsigned int edge;
 
@@ -206,12 +206,12 @@ struct _E_Gesture_Event_Tap_Finger
 {
    Eina_Bool enabled;
    unsigned int max_repeats;
-   E_Gesture_Event_Tap_Finger_Repeats repeats[E_GESTURE_TAP_REPEATS_MAX+1];
+   E_Gesture_Event_Tap_Finger_Repeats repeats[E_GESTURE_TAP_REPEATS_MAX + 1];
 };
 
 struct _E_Gesture_Event_Tap
 {
-   E_Gesture_Event_Tap_Finger fingers[E_GESTURE_FINGER_MAX+2];
+   E_Gesture_Event_Tap_Finger fingers[E_GESTURE_FINGER_MAX + 2];
    E_Gesture_Tap_State state;
    unsigned int enabled_finger;
    unsigned int repeats;
@@ -244,7 +244,7 @@ struct _E_Gesture_Event
    E_Gesture_Event_Tap taps;
    E_Gesture_Event_Pan pans;
 
-   E_Gesture_Finger base_point[E_GESTURE_FINGER_MAX+2];
+   E_Gesture_Finger base_point[E_GESTURE_FINGER_MAX + 2];
 
    int num_pressed;
    Eina_Bool recognized_gesture;
