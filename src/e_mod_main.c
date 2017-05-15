@@ -34,6 +34,9 @@ _e_gesture_set_client_to_list(E_Gesture_Grabbed_Client *gclient, struct wl_clien
         case TIZEN_GESTURE_TYPE_PINCH:
            gclient->pinch_fingers[fingers].client = client;
            break;
+        case TIZEN_GESTURE_TYPE_PALM_COVER:
+           gclient->palm_cover.client = client;
+           break;
         default:
            return;
      }
@@ -251,6 +254,13 @@ _e_gesture_remove_client_destroy_listener(struct wl_client *client, unsigned int
                     }
                }
 
+             if ((mode & TIZEN_GESTURE_TYPE_PALM_COVER) &&
+                 (data->grabbed_gesture & TIZEN_GESTURE_TYPE_PALM_COVER))
+               {
+                  _e_gesture_set_client_to_list(data, NULL, TIZEN_GESTURE_TYPE_PALM_COVER, 0, 0, 0);
+                  data->grabbed_gesture &= ~TIZEN_GESTURE_TYPE_PALM_COVER;
+               }
+
              if (!data->grabbed_gesture)
                {
                   wl_list_remove(&data->destroy_listener->link);
@@ -395,6 +405,58 @@ _e_gesture_ungrab_pinch(struct wl_client *client, struct wl_resource *resource, 
 finish:
    return ret;
 }
+
+static int
+_e_gesture_grab_palm_cover(struct wl_client *client, struct wl_resource *resource)
+{
+   E_Gesture_Event *gev;
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   gev = &gesture->gesture_events;
+
+   GTINF("The client %p request to grab palm hover gesture\n", client);
+
+   if (gev->palm_covers.client_info.client)
+     {
+        GTWRN("Palm hover is already grabbed by %p client\n", gev->palm_covers.client_info.client);
+        goto finish;
+     }
+
+   e_gesture_add_client_destroy_listener(client, TIZEN_GESTURE_TYPE_PALM_COVER, 0, 0, 0);
+
+   gev->palm_covers.client_info.client = client;
+   gev->palm_covers.client_info.res = resource;
+
+   gesture->grabbed_gesture |= TIZEN_GESTURE_TYPE_PALM_COVER;
+   gesture->gesture_filter = E_GESTURE_TYPE_ALL & ~gesture->grabbed_gesture;
+
+finish:
+   return ret;
+}
+
+static int
+_e_gesture_ungrab_palm_cover(struct wl_client *client, struct wl_resource *resource)
+{
+   E_Gesture_Event *gev;
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   GTINF("The client %p request to ungrab palm hover gesture\n", client);
+
+   gev = &gesture->gesture_events;
+
+   if (gev->palm_covers.client_info.client == client)
+     {
+        gev->palm_covers.client_info.client = NULL;
+        gev->palm_covers.client_info.client = NULL;
+     }
+
+   _e_gesture_remove_client_destroy_listener(client, TIZEN_GESTURE_TYPE_PALM_COVER, 0, 0, 0);
+   gesture->grabbed_gesture &= ~TIZEN_GESTURE_TYPE_PALM_COVER;
+   gesture->gesture_filter = E_GESTURE_TYPE_ALL & ~gesture->grabbed_gesture;
+
+   return ret;
+}
+
 
 static void
 _e_gesture_cb_grab_edge_swipe(struct wl_client *client,
@@ -715,6 +777,28 @@ _e_gesture_cb_ungrab_pinch(struct wl_client *client,
    tizen_gesture_send_pinch_notify(resource, fingers, ret);
 }
 
+static void
+_e_gesture_cb_grab_palm_cover(struct wl_client *client,
+                        struct wl_resource *resource)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = _e_gesture_grab_palm_cover(client, resource);
+
+   tizen_gesture_send_palm_cover_notify(resource, ret);
+}
+
+static void
+_e_gesture_cb_ungrab_palm_cover(struct wl_client *client,
+                        struct wl_resource *resource)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = _e_gesture_ungrab_palm_cover(client, resource);
+
+   tizen_gesture_send_palm_cover_notify(resource, ret);
+}
+
 static const struct tizen_gesture_interface _e_gesture_implementation = {
    _e_gesture_cb_grab_edge_swipe,
    _e_gesture_cb_ungrab_edge_swipe,
@@ -723,7 +807,9 @@ static const struct tizen_gesture_interface _e_gesture_implementation = {
    _e_gesture_cb_grab_pan,
    _e_gesture_cb_ungrab_pan,
    _e_gesture_cb_grab_pinch,
-   _e_gesture_cb_ungrab_pinch
+   _e_gesture_cb_ungrab_pinch,
+   _e_gesture_cb_grab_palm_cover,
+   _e_gesture_cb_ungrab_palm_cover
 };
 
 /* tizen_gesture global object destroy function */
@@ -1087,6 +1173,18 @@ _e_gesture_remove_client_pinch(struct wl_client *client, E_Gesture_Grabbed_Clien
 }
 
 static void
+_e_gesture_remove_client_palm_cover(struct wl_client *client, E_Gesture_Grabbed_Client *gclient)
+{
+   if (gclient->palm_cover.client)
+     {
+        gesture->gesture_events.palm_covers.client_info.client = NULL;
+        gesture->gesture_events.palm_covers.client_info.res = NULL;
+     }
+   gclient->palm_cover.client = NULL;
+}
+
+
+static void
 _e_gesture_wl_client_cb_destroy(struct wl_listener *l, void *data)
 {
    struct wl_client *client = data;
@@ -1118,6 +1216,11 @@ _e_gesture_wl_client_cb_destroy(struct wl_listener *l, void *data)
                   _e_gesture_remove_client_pinch(client, client_data);
                   removed_gesture |= TIZEN_GESTURE_TYPE_PINCH;
                }
+             if (client_data->grabbed_gesture & TIZEN_GESTURE_TYPE_PALM_COVER)
+               {
+                  _e_gesture_remove_client_palm_cover(client, client_data);
+                  removed_gesture |= TIZEN_GESTURE_TYPE_PALM_COVER;
+               }
           }
      }
 
@@ -1129,6 +1232,8 @@ _e_gesture_wl_client_cb_destroy(struct wl_listener *l, void *data)
      _e_gesture_pan_current_list_check();
    if (removed_gesture & TIZEN_GESTURE_TYPE_PINCH)
      _e_gesture_pinch_current_list_check();
+   if (removed_gesture & TIZEN_GESTURE_TYPE_PALM_COVER)
+     gesture->grabbed_gesture &= ~TIZEN_GESTURE_TYPE_PALM_COVER;
 
    wl_list_remove(&l->link);
    E_FREE(l);
@@ -1141,6 +1246,8 @@ _e_gesture_wl_client_cb_destroy(struct wl_listener *l, void *data)
              E_FREE(client_data);
           }
      }
+
+   gesture->gesture_filter = E_GESTURE_TYPE_ALL & ~gesture->grabbed_gesture;
 }
 
 void

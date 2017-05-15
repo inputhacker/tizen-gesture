@@ -485,6 +485,13 @@ _e_gesture_util_center_axis_get(int num_finger, int *x, int *y)
    int i;
    int calc_x = 0, calc_y = 0;
 
+   if (num_finger <= 0)
+     {
+        *x = 0;
+        *y = 0;
+        return;
+     }
+
    for (i = 1; i <= num_finger; i++)
      {
         calc_x += gesture->gesture_events.base_point[i].axis.x;
@@ -1304,6 +1311,81 @@ _e_gesture_process_key_up(void *event)
    return E_GESTURE_EVENT_STATE_PROPAGATE;
 }
 
+static void
+_e_gesture_send_palm_cover(void)
+{
+   Ecore_Event_Mouse_Button *ev_cancel;
+   E_Gesture_Event_Palm_Cover *palm_covers = &gesture->gesture_events.palm_covers;
+   int time;
+   int cx = 0, cy = 0;
+
+   time = (int)(ecore_time_get()*1000);
+
+   if (gesture->event_state == E_GESTURE_EVENT_STATE_KEEP)
+     {
+        _e_gesture_event_drop();
+     }
+   else if (gesture->event_state == E_GESTURE_EVENT_STATE_PROPAGATE)
+     {
+        ev_cancel = E_NEW(Ecore_Event_Mouse_Button, 1);
+        EINA_SAFETY_ON_NULL_RETURN(ev_cancel);
+
+        ev_cancel->timestamp = time;
+        ev_cancel->same_screen = 1;
+
+        ecore_event_add(ECORE_EVENT_MOUSE_BUTTON_CANCEL, ev_cancel, NULL, NULL);
+     }
+
+   _e_gesture_util_center_axis_get(gesture->gesture_events.num_pressed, &cx, &cy);
+
+   GTINF("Send palm_cover gesture to client: %p\n", palm_covers->client_info.client);
+
+   tizen_gesture_send_palm_cover(palm_covers->client_info.res, TIZEN_GESTURE_MODE_BEGIN, time, cx, cy);
+   tizen_gesture_send_palm_cover(palm_covers->client_info.res, TIZEN_GESTURE_MODE_END, time, cx, cy);
+
+   gesture->event_state = E_GESTURE_EVENT_STATE_IGNORE;
+   gesture->gesture_events.recognized_gesture |= TIZEN_GESTURE_TYPE_PALM_COVER;
+}
+
+static void
+_e_gesture_process_palm_cover(int val)
+{
+   if (gesture->gesture_events.recognized_gesture)
+     {
+        return;
+     }
+
+   _e_gesture_send_palm_cover();
+}
+
+static void
+_e_gesture_process_palm(int val)
+{
+   if (val <= 0) return;
+   if (!gesture->grabbed_gesture) return;
+
+   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_PALM_COVER))
+     {
+        _e_gesture_process_palm_cover(val);
+     }
+}
+
+static E_Gesture_Event_State
+_e_gesture_process_axis_update(void *event)
+{
+   Ecore_Event_Axis_Update *ev = event;
+   int i;
+
+   for (i = 0; i < ev->naxis; i++)
+     {
+        if (ev->axis[i].label == ECORE_AXIS_LABEL_TOUCH_PALM)
+          {
+             _e_gesture_process_palm((int)ev->axis[i].value);
+          }
+     }
+   return E_GESTURE_EVENT_STATE_PROPAGATE;
+}
+
 /* Function for checking the existing grab for a key and sending key event(s) */
 Eina_Bool
 e_gesture_process_events(void *event, int type)
@@ -1325,6 +1407,8 @@ e_gesture_process_events(void *event, int type)
      res = _e_gesture_process_device_add(event);
    else if (type == ECORE_EVENT_DEVICE_DEL)
      res = _e_gesture_process_device_del(event);
+   else if (type == ECORE_EVENT_AXIS_UPDATE)
+     res = _e_gesture_process_axis_update(event);
    else return ret;
 
    switch (res)

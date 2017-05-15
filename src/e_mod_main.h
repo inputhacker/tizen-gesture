@@ -12,8 +12,8 @@
 #define GTDBG(msg, ARG...) DBG("[tizen_gesture][%s:%d] "msg, __FUNCTION__, __LINE__, ##ARG)
 
 #define E_GESTURE_FINGER_MAX 3
-#define E_GESTURE_TYPE_MAX TIZEN_GESTURE_TYPE_TAP+1
-#define E_GESTURE_TYPE_ALL (TIZEN_GESTURE_TYPE_EDGE_SWIPE | TIZEN_GESTURE_TYPE_TAP)
+#define E_GESTURE_TYPE_MAX (TIZEN_GESTURE_TYPE_PALM_COVER + 1)
+#define E_GESTURE_TYPE_ALL (TIZEN_GESTURE_TYPE_EDGE_SWIPE | TIZEN_GESTURE_TYPE_TAP | TIZEN_GESTURE_TYPE_PAN | TIZEN_GESTURE_TYPE_PINCH | TIZEN_GESTURE_TYPE_PALM_COVER)
 #define E_GESTURE_KEYBOARD_NAME "Gesture Keyboard"
 #define E_GESTURE_AUX_HINT_GESTURE_DISABLE "wm.policy.win.gesture.disable"
 
@@ -62,6 +62,8 @@ typedef struct _E_Gesture_Event_Tap E_Gesture_Event_Tap;
 typedef struct _E_Gesture_Event_Pan E_Gesture_Event_Pan;
 
 typedef struct _E_Gesture_Event_Pinch E_Gesture_Event_Pinch;
+
+typedef struct _E_Gesture_Event_Palm_Cover E_Gesture_Event_Palm_Cover;
 
 typedef struct _Coords Coords;
 typedef struct _Rect Rect;
@@ -268,6 +270,12 @@ struct _E_Gesture_Event_Pinch
    Ecore_Timer *move_timer;
 };
 
+struct _E_Gesture_Event_Palm_Cover
+{
+   E_Gesture_Event_Client client_info;
+   unsigned int start_time;
+};
+
 struct _E_Gesture_Grabbed_Client
 {
    struct wl_client *client;
@@ -278,6 +286,7 @@ struct _E_Gesture_Grabbed_Client
    E_Gesture_Event_Tap_Finger tap_fingers[E_GESTURE_FINGER_MAX + 2];
    E_Gesture_Event_Client pan_fingers[E_GESTURE_FINGER_MAX + 2];
    E_Gesture_Event_Client pinch_fingers[E_GESTURE_FINGER_MAX + 2];
+   E_Gesture_Event_Client palm_cover;
 };
 
 struct _E_Gesture_Event
@@ -286,6 +295,7 @@ struct _E_Gesture_Event
    E_Gesture_Event_Tap taps;
    E_Gesture_Event_Pan pans;
    E_Gesture_Event_Pinch pinchs;
+   E_Gesture_Event_Palm_Cover palm_covers;
 
    E_Gesture_Finger base_point[E_GESTURE_FINGER_MAX + 2];
 
