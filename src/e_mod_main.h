@@ -39,7 +39,7 @@
 #define E_GESTURE_PAN_START_TIME 0.05
 #define E_GESTURE_PAN_MOVING_RANGE 15
 
-#define E_GESTURE_PINCH_MOVING_DISTANCE_RANGE 15
+#define E_GESTURE_PINCH_MOVING_DISTANCE_RANGE 15.0
 
 #define ABS(x) (((x)>0)?(x):-(x))
 
@@ -246,7 +246,7 @@ struct _E_Gesture_Event_Pinch
 {
    E_Gesture_Event_Client fingers[E_GESTURE_FINGER_MAX + 2];
    E_Gesture_PanPinch_State state;
-   int distance;
+   double distance;
    int num_pinch_fingers;
 
    Ecore_Timer *start_timer;

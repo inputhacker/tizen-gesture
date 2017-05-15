@@ -501,21 +501,21 @@ _e_gesture_util_center_axis_get(int num_finger, int *x, int *y)
    *y = calc_y;
 }
 
-static int
+static double
 _e_gesture_util_distance_get(int x1, int y1, int x2, int y2)
 {
-   int distance;
+   double distance;
 
    distance = sqrt(((x2 - x1) * (x2 - x1)) + ((y2 - y1) * (y2 - y1)));
 
    return distance;
 }
 
-static int
+static double
 _e_gesture_util_distances_get(int num_finger)
 {
-   int i;
-   int cx = 0, cy = 0, distance = 0;
+   int i, cx = 0, cy = 0;
+   double distance = 0.0;
 
    _e_gesture_util_center_axis_get(num_finger, &cx, &cy);
 
@@ -642,9 +642,10 @@ _e_gesture_process_pan_up(Ecore_Event_Mouse_Button *ev)
 }
 
 static void
-_e_gesture_pinch_send(int mode, int fingers, int distance, int angle, int cx, int cy, struct wl_resource *res, struct wl_client *client)
+_e_gesture_pinch_send(int mode, int fingers, double distance, double angle, int cx, int cy, struct wl_resource *res, struct wl_client *client)
 {
    Ecore_Event_Mouse_Button *ev_cancel;
+   wl_fixed_t distance_fixed, angle_fixed;
 
    if (mode == TIZEN_GESTURE_MODE_BEGIN)
      {
@@ -657,9 +658,12 @@ _e_gesture_pinch_send(int mode, int fingers, int distance, int angle, int cx, in
         ecore_event_add(ECORE_EVENT_MOUSE_BUTTON_CANCEL, ev_cancel, NULL, NULL);
      }
 
-   GTINF("Send pinch gesture (fingers: %d, distance: %d, angle: %d, cx: %d, cy: %d) to client: %p, mode: %d\n", fingers, distance, angle, cx, cy, client, mode);
+   GTINF("Send pinch gesture (fingers: %d, distance: %lf, angle: %lf, cx: %d, cy: %d) to client: %p, mode: %d\n", fingers, distance, angle, cx, cy, client, mode);
 
-   tizen_gesture_send_pinch(res, mode, fingers, distance, angle, cx, cy);
+   distance_fixed = wl_fixed_from_double(distance);
+   angle_fixed = wl_fixed_from_double(angle);
+
+   tizen_gesture_send_pinch(res, mode, fingers, distance_fixed, angle_fixed, cx, cy);
 
    gesture->gesture_events.recognized_gesture |= TIZEN_GESTURE_TYPE_PINCH;
 }
@@ -681,7 +685,7 @@ _e_gesture_pinch_cancel(void)
      }
 
    if (pinchs->state == E_GESTURE_PANPINCH_STATE_MOVING)
-     _e_gesture_pinch_send(TIZEN_GESTURE_MODE_END, pinchs->num_pinch_fingers, 0, 0, 0, 0,
+     _e_gesture_pinch_send(TIZEN_GESTURE_MODE_END, pinchs->num_pinch_fingers, 0.0, 0.0, 0, 0,
                            pinchs->fingers[pinchs->num_pinch_fingers].res,
                            pinchs->fingers[pinchs->num_pinch_fingers].client);
 
@@ -729,7 +733,8 @@ static void
 _e_gesture_process_pinch_move(Ecore_Event_Mouse_Move *ev)
 {
    E_Gesture_Event_Pinch *pinch = &gesture->gesture_events.pinchs;
-   int idx, current_distance, mode, diff, angle, cx = 0, cy = 0;
+   int idx, mode, cx = 0, cy = 0;
+   double current_distance = 0.0, diff = 0.0, angle = 0.0;
 
    if (gesture->gesture_events.recognized_gesture &&
        !((gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PAN) ||
@@ -764,7 +769,7 @@ _e_gesture_process_pinch_move(Ecore_Event_Mouse_Move *ev)
                                                         gesture->gesture_events.base_point[1].axis.y,
                                                         gesture->gesture_events.base_point[2].axis.x,
                                                         gesture->gesture_events.base_point[2].axis.y);
-        else angle = 0;
+        else angle = 0.0;
 
         _e_gesture_util_center_axis_get(idx, &cx, &cy);
 
