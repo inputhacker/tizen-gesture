@@ -740,7 +740,7 @@ _e_gesture_cb_bind(struct wl_client *client, void *data, uint32_t version, uint3
    E_GesturePtr gesture_instance = data;
    struct wl_resource *resource;
 
-   resource = wl_resource_create(client, &tizen_gesture_interface, MIN(version, 1), id);
+   resource = wl_resource_create(client, &tizen_gesture_interface, MAX(version, 1), id);
 
    GTDBG("wl_resource_create(...,tizen_gesture_interface,...)\n");
 
@@ -910,7 +910,7 @@ _e_gesture_init(E_Module *m)
    GTDBG("area_offset: %d, min_length: %d, max_length: %d\n", gconfig->conf->edge_swipe.area_offset, gconfig->conf->edge_swipe.min_length, gconfig->conf->edge_swipe.max_length);
    GTDBG("compose key: %d, back: %d, default: %d\n", gconfig->conf->edge_swipe.compose_key, gconfig->conf->edge_swipe.back_key, gconfig->conf->edge_swipe.default_enable_back);
 
-   gesture->global = wl_global_create(e_comp_wl->wl.disp, &tizen_gesture_interface, 1, gesture, _e_gesture_cb_bind);
+   gesture->global = wl_global_create(e_comp_wl->wl.disp, &tizen_gesture_interface, 2, gesture, _e_gesture_cb_bind);
    if (!gesture->global)
      {
         GTERR("Failed to create global !\n");
