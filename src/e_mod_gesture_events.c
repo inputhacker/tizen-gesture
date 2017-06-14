@@ -545,6 +545,28 @@ _e_gesture_util_angle_get(int x1, int y1, int x2, int y2)
    return angle;
 }
 
+static void
+_e_gesture_util_rect_get(int finger, int *x1, int *y1, int *x2, int *y2)
+{
+   int i;
+
+   *x1 = *x2 = gesture->gesture_events.base_point[1].axis.x;
+   *y1 = *y2 = gesture->gesture_events.base_point[1].axis.y;
+
+   for (i = 2; i < finger + 1; i++)
+     {
+        if (gesture->gesture_events.base_point[i].axis.x < *x1)
+          *x1 = gesture->gesture_events.base_point[i].axis.x;
+        else if (gesture->gesture_events.base_point[i].axis.x > *x2)
+          *x2 = gesture->gesture_events.base_point[i].axis.x;
+
+        if (gesture->gesture_events.base_point[i].axis.y < *y1)
+          *y1 = gesture->gesture_events.base_point[i].axis.y;
+        else if (gesture->gesture_events.base_point[i].axis.y > *y2)
+          *y2 = gesture->gesture_events.base_point[i].axis.y;
+     }
+}
+
 static Eina_Bool
 _e_gesture_timer_pan_start(void *data)
 {
@@ -838,6 +860,10 @@ _e_gesture_tap_cancel(void)
    taps->repeats = 0;
    taps->enabled_finger = 0;
    taps->state = E_GESTURE_TAP_STATE_READY;
+   taps->base_rect.x1 = 0;
+   taps->base_rect.y1 = 0;
+   taps->base_rect.x2 = 0;
+   taps->base_rect.y2 = 0;
    gesture->gesture_filter |= TIZEN_GESTURE_TYPE_TAP;
    _e_gesture_event_flush();
    gesture->gesture_events.recognized_gesture &= ~TIZEN_GESTURE_TYPE_TAP;
@@ -978,6 +1004,13 @@ _e_gesture_process_tap_down(Ecore_Event_Mouse_Button *ev)
    if (taps->enabled_finger > taps->max_fingers)
      _e_gesture_tap_cancel();
 
+   if (taps->state == E_GESTURE_TAP_STATE_READY ||
+       taps->state == E_GESTURE_TAP_STATE_START ||
+       taps->state == E_GESTURE_TAP_STATE_PROCESS)
+     {
+        _e_gesture_util_rect_get(taps->enabled_finger, &taps->base_rect.x1, &taps->base_rect.y1, &taps->base_rect.x2, &taps->base_rect.y2);
+     }
+
    switch (taps->state)
      {
         case E_GESTURE_TAP_STATE_NONE:
@@ -1014,18 +1047,26 @@ _e_gesture_process_tap_down(Ecore_Event_Mouse_Button *ev)
 static void
 _e_gesture_process_tap_move(Ecore_Event_Mouse_Move *ev)
 {
-   int diff_x, diff_y;
+   E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+   Rect current_rect = {0, };
+   int xx1, yy1, xx2, yy2;
 
    if (gesture->gesture_events.recognized_gesture)
      _e_gesture_tap_cancel();
 
-   diff_x = gesture->gesture_events.base_point[ev->multi.device + 1].axis.x - ev->x;
-   diff_y = gesture->gesture_events.base_point[ev->multi.device + 1].axis.y - ev->y;
+   _e_gesture_util_rect_get(taps->enabled_finger, &current_rect.x1, &current_rect.y1, &current_rect.x2, &current_rect.y2);
 
-   if (ABS(diff_x) > E_GESTURE_TAP_MOVING_RANGE ||
-       ABS(diff_y) > E_GESTURE_TAP_MOVING_RANGE)
+   xx1 = taps->base_rect.x1 - current_rect.x1;
+   yy1 = taps->base_rect.y1 - current_rect.y1;
+   xx2 = taps->base_rect.x2 - current_rect.x2;
+   yy2 = taps->base_rect.y2 - current_rect.y2;
+
+   if (ABS(xx1) > E_GESTURE_TAP_MOVING_RANGE ||
+       ABS(yy1) > E_GESTURE_TAP_MOVING_RANGE ||
+       ABS(xx2) > E_GESTURE_TAP_MOVING_RANGE ||
+       ABS(yy2) > E_GESTURE_TAP_MOVING_RANGE)
      {
-        GTDBG("%d finger moving too large diff: (%d, %d)\n", ev->multi.device, diff_x, diff_y);
+        GTDBG("%d finger moving too large diff: (%d, %d)(%d, %d)\n", ev->multi.device, xx1, yy1, xx2, yy2);
         _e_gesture_tap_cancel();
      }
 }

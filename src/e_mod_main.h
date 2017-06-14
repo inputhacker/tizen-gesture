@@ -64,6 +64,7 @@ typedef struct _E_Gesture_Event_Pan E_Gesture_Event_Pan;
 typedef struct _E_Gesture_Event_Pinch E_Gesture_Event_Pinch;
 
 typedef struct _Coords Coords;
+typedef struct _Rect Rect;
 typedef struct _E_Gesture_Finger E_Gesture_Finger;
 typedef struct _E_Gesture_Event_Info E_Gesture_Event_Info;
 typedef struct _E_Gesture_Event_Client E_Gesture_Event_Client;
@@ -116,6 +117,12 @@ enum _E_Gesture_PanPinch_State
 struct _Coords
 {
    int x, y;
+};
+
+struct _Rect
+{
+   int x1, y1;
+   int x2, y2;
 };
 
 struct _E_Gesture_Finger
@@ -218,6 +225,8 @@ struct _E_Gesture_Event_Tap
    Ecore_Timer *done_timer;
    /* interval timer */
    Ecore_Timer *interval_timer;
+
+   Rect base_rect;
 };
 
 struct _E_Gesture_Event_Pan
