@@ -32,8 +32,8 @@
 
 #define E_GESTURE_TAP_REPEATS_MAX 3
 #define E_GESTURE_TAP_START_TIME 0.05
-#define E_GESTURE_TAP_DONE_TIME 1
-#define E_GESTURE_TAP_INTERVAL_TIME 1
+#define E_GESTURE_TAP_DONE_TIME 1.0
+#define E_GESTURE_TAP_INTERVAL_TIME 1.0
 #define E_GESTURE_TAP_MOVING_RANGE 25
 
 #define E_GESTURE_PAN_START_TIME 0.05
@@ -140,6 +140,7 @@ struct _E_Gesture_Event_Info
 struct _E_Gesture_Conf_Edd
 {
    char *key_device_name;
+   Eina_Bool event_keep;
    struct
    {
       double time_done;
@@ -150,8 +151,24 @@ struct _E_Gesture_Conf_Edd
       int compose_key;
       int back_key;
       Eina_Bool default_enable_back;
-      Eina_Bool event_keep;
    } edge_swipe;
+   struct
+     {
+        int repeats_max;
+        double time_start;
+        double time_done;
+        double time_interval;
+        int moving_range;
+     } tap;
+   struct
+     {
+        double time_start;
+        int moving_range;
+     } pan;
+   struct
+     {
+        double moving_distance_range;
+     } pinch;
 };
 
 struct _E_Gesture_Config_Data
@@ -194,8 +211,6 @@ struct _E_Gesture_Event_Edge_Swipe
 
    Ecore_Timer *start_timer;
    Ecore_Timer *done_timer;
-
-   Eina_Bool event_keep;
 };
 
 struct _E_Gesture_Event_Tap_Finger_Repeats
@@ -276,6 +291,7 @@ struct _E_Gesture_Event
 
    int num_pressed;
    Eina_Bool recognized_gesture;
+   Eina_Bool event_keep;
 };
 
 struct _E_Gesture

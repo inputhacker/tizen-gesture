@@ -102,7 +102,7 @@ _e_gesture_edge_swipe_current_list_check(void)
         gev->edge_swipes.fingers[i].enabled = EINA_FALSE;
      }
    gesture->grabbed_gesture &= ~TIZEN_GESTURE_TYPE_EDGE_SWIPE;
-   if (gev->edge_swipes.event_keep) gesture->event_state = E_GESTURE_EVENT_STATE_PROPAGATE;
+   if (gev->event_keep) gesture->event_state = E_GESTURE_EVENT_STATE_PROPAGATE;
 }
 
 static void
@@ -469,7 +469,7 @@ _e_gesture_cb_grab_edge_swipe(struct wl_client *client,
    e_gesture_add_client_destroy_listener(client, TIZEN_GESTURE_TYPE_EDGE_SWIPE, fingers, edge & ~grabbed_edge, 0);
    gesture->grabbed_gesture |= TIZEN_GESTURE_TYPE_EDGE_SWIPE;
    gev->edge_swipes.fingers[fingers].enabled = EINA_TRUE;
-   if (gev->edge_swipes.event_keep) gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
+   if (gev->event_keep) gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
    gev->edge_swipes.enabled_edge |= grabbed_edge;
 
    if (!grabbed_edge)
@@ -877,8 +877,8 @@ static E_Gesture_Config_Data *
 _e_gesture_init(E_Module *m)
 {
    E_Gesture_Config_Data *gconfig = NULL;
-   gesture = E_NEW(E_Gesture, 1);
 
+   gesture = E_NEW(E_Gesture, 1);
    if (!gesture)
      {
         GTERR("Failed to allocate memory for gesture !\n");
@@ -905,10 +905,24 @@ _e_gesture_init(E_Module *m)
    EINA_SAFETY_ON_NULL_GOTO(gconfig->conf, err);
    gesture->config = gconfig;
 
-   GTDBG("config value\n");
-   GTDBG("keyboard: %s, time_done: %lf, time_begin: %lf\n", gconfig->conf->key_device_name, gconfig->conf->edge_swipe.time_done, gconfig->conf->edge_swipe.time_begin);
-   GTDBG("area_offset: %d, min_length: %d, max_length: %d\n", gconfig->conf->edge_swipe.area_offset, gconfig->conf->edge_swipe.min_length, gconfig->conf->edge_swipe.max_length);
-   GTDBG("compose key: %d, back: %d, default: %d\n", gconfig->conf->edge_swipe.compose_key, gconfig->conf->edge_swipe.back_key, gconfig->conf->edge_swipe.default_enable_back);
+   GTDBG("gesture config value\n");
+   GTDBG("key_device_name: %s, event_keep: %d\n", gconfig->conf->key_device_name, gconfig->conf->event_keep);
+   GTDBG("edge_swipe\n");
+   GTDBG("\ttime_done: %lf, time_begin: %lf, area_offset: %d\n", gconfig->conf->edge_swipe.time_done,
+                                                                 gconfig->conf->edge_swipe.time_begin,
+                                                                 gconfig->conf->edge_swipe.area_offset);
+   GTDBG("\tmin_length: %d, max_length: %d, compose_key: %d, back_key: %d\n", gconfig->conf->edge_swipe.min_length,
+                                                                              gconfig->conf->edge_swipe.max_length,
+                                                                              gconfig->conf->edge_swipe.compose_key,
+                                                                              gconfig->conf->edge_swipe.back_key);
+   GTDBG("tap\n");
+   GTDBG("\trepeats_max: %d, moving_range: %d\n", gconfig->conf->tap.repeats_max,
+                                                  gconfig->conf->tap.moving_range);
+   GTDBG("\ttime_start: %lf, time_done: %lf, time_interval: %lf\n", gconfig->conf->tap.time_start,
+                                                                    gconfig->conf->tap.time_done,
+                                                                    gconfig->conf->tap.time_interval);
+   GTDBG("pan time_start: %lf, moving_range: %d\n", gconfig->conf->pan.time_start, gconfig->conf->pan.moving_range);
+   GTDBG("pinch moving_distance_range: %lf\n", gconfig->conf->pinch.moving_distance_range);
 
    gesture->global = wl_global_create(e_comp_wl->wl.disp, &tizen_gesture_interface, 2, gesture, _e_gesture_cb_bind);
    if (!gesture->global)
@@ -919,7 +933,7 @@ _e_gesture_init(E_Module *m)
 
    gesture->gesture_filter = E_GESTURE_TYPE_MAX;
 
-   gesture->gesture_events.edge_swipes.event_keep = gconfig->conf->edge_swipe.event_keep;
+   gesture->gesture_events.event_keep = gconfig->conf->event_keep;
    if (gconfig->conf->edge_swipe.default_enable_back)
      {
         gesture->grabbed_gesture |= TIZEN_GESTURE_TYPE_EDGE_SWIPE;
@@ -927,7 +941,7 @@ _e_gesture_init(E_Module *m)
         gesture->gesture_events.edge_swipes.fingers[1].edge[E_GESTURE_EDGE_TOP].client = (void *)0x1;
         gesture->gesture_events.edge_swipes.fingers[1].edge[E_GESTURE_EDGE_TOP].res = (void *)0x1;
         gesture->gesture_events.edge_swipes.enabled_edge |= TIZEN_GESTURE_EDGE_TOP;
-        if (gesture->gesture_events.edge_swipes.event_keep)
+        if (gesture->gesture_events.event_keep)
           {
              gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
           }

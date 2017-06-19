@@ -190,7 +190,6 @@ _e_gesture_send_edge_swipe(int fingers, int x, int y, int edge, struct wl_client
    enum tizen_gesture_edge dir = 0;
    Ecore_Event_Mouse_Button *ev_cancel;
    E_Gesture_Conf_Edd *conf = gesture->config->conf;
-   E_Gesture_Event_Edge_Swipe *edge_swipes = &gesture->gesture_events.edge_swipes;
 
    switch (edge)
      {
@@ -208,7 +207,7 @@ _e_gesture_send_edge_swipe(int fingers, int x, int y, int edge, struct wl_client
            break;
      }
 
-   if (edge_swipes->event_keep)
+   if (gesture->gesture_events.event_keep)
      {
         _e_gesture_event_drop();
      }
@@ -270,7 +269,7 @@ _e_gesture_timer_edge_swipe_start(void *data)
        (edge_swipes->edge == E_GESTURE_EDGE_BOTTOM && !edge_swipes->fingers[idx].edge[E_GESTURE_EDGE_BOTTOM].client) ||
        (edge_swipes->edge == E_GESTURE_EDGE_RIGHT && !edge_swipes->fingers[idx].edge[E_GESTURE_EDGE_RIGHT].client))
      {
-        if (edge_swipes->event_keep)
+        if (gesture->gesture_events.event_keep)
           _e_gesture_event_flush();
         _e_gesture_edge_swipe_cancel();
      }
@@ -284,7 +283,7 @@ _e_gesture_timer_edge_swipe_done(void *data)
 
    GTDBG("Edge_Swipe done timer is expired. Currently alived edge_swipe fingers: 0x%x\n", edge_swipes->enabled_finger);
 
-   if (edge_swipes->event_keep)
+   if (gesture->gesture_events.event_keep)
      _e_gesture_event_flush();
    _e_gesture_edge_swipe_cancel();
 
@@ -333,7 +332,7 @@ _e_gesture_process_edge_swipe_down(Ecore_Event_Mouse_Button *ev)
           }
         else
           {
-             if (edge_swipes->event_keep)
+             if (gesture->gesture_events.event_keep)
                _e_gesture_event_flush();
              _e_gesture_edge_swipe_cancel();
           }
@@ -343,7 +342,7 @@ _e_gesture_process_edge_swipe_down(Ecore_Event_Mouse_Button *ev)
         edge_swipes->enabled_finger &= ~(1 << (gesture->gesture_events.num_pressed - 1));
         if (edge_swipes->start_timer == NULL)
           {
-             if (edge_swipes->event_keep)
+             if (gesture->gesture_events.event_keep)
                _e_gesture_event_flush();
              _e_gesture_edge_swipe_cancel();
           }
@@ -369,7 +368,7 @@ _e_gesture_process_edge_swipe_move(Ecore_Event_Mouse_Move *ev)
         case E_GESTURE_EDGE_TOP:
            if (diff.x > conf->edge_swipe.min_length)
              {
-                if (edge_swipes->event_keep)
+                if (gesture->gesture_events.event_keep)
                   _e_gesture_event_flush();
                 _e_gesture_edge_swipe_cancel();
                 break;
@@ -382,7 +381,7 @@ _e_gesture_process_edge_swipe_move(Ecore_Event_Mouse_Move *ev)
         case E_GESTURE_EDGE_LEFT:
            if (diff.y > conf->edge_swipe.min_length)
              {
-                if (edge_swipes->event_keep)
+                if (gesture->gesture_events.event_keep)
                   _e_gesture_event_flush();
                 _e_gesture_edge_swipe_cancel();
                 break;
@@ -395,7 +394,7 @@ _e_gesture_process_edge_swipe_move(Ecore_Event_Mouse_Move *ev)
         case E_GESTURE_EDGE_BOTTOM:
            if (diff.x > conf->edge_swipe.min_length)
              {
-                if (edge_swipes->event_keep)
+                if (gesture->gesture_events.event_keep)
                   _e_gesture_event_flush();
                 _e_gesture_edge_swipe_cancel();
                 break;
@@ -408,7 +407,7 @@ _e_gesture_process_edge_swipe_move(Ecore_Event_Mouse_Move *ev)
         case E_GESTURE_EDGE_RIGHT:
            if (diff.y > conf->edge_swipe.min_length)
              {
-                if (edge_swipes->event_keep)
+                if (gesture->gesture_events.event_keep)
                   _e_gesture_event_flush();
                 _e_gesture_edge_swipe_cancel();
                 break;
@@ -427,9 +426,7 @@ _e_gesture_process_edge_swipe_move(Ecore_Event_Mouse_Move *ev)
 static void
 _e_gesture_process_edge_swipe_up(Ecore_Event_Mouse_Button *ev)
 {
-   E_Gesture_Event_Edge_Swipe *edge_swipes = &gesture->gesture_events.edge_swipes;
-
-   if (edge_swipes->event_keep)
+   if (gesture->gesture_events.event_keep)
      _e_gesture_event_flush();
    _e_gesture_edge_swipe_cancel();
 }
@@ -825,10 +822,11 @@ unsigned int
 e_gesture_util_tap_max_repeats_get(unsigned int fingers)
 {
    E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+   E_Gesture_Conf_Edd *conf = gesture->config->conf;
    int i;
    unsigned int max = 0;
 
-   for (i = 0; i < E_GESTURE_TAP_REPEATS_MAX + 1; i++)
+   for (i = 0; i < conf->tap.repeats_max + 1; i++)
      {
         if (taps->fingers[fingers].repeats[i].client) max = i;
      }
@@ -942,15 +940,16 @@ static void
 _e_gesture_tap_start(void)
 {
    E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+   E_Gesture_Conf_Edd *conf = gesture->config->conf;
 
    taps->state = E_GESTURE_TAP_STATE_START;
    if (!taps->start_timer)
      {
-        taps->start_timer = ecore_timer_add(E_GESTURE_TAP_START_TIME, _e_gesture_timer_tap_start, NULL);
+        taps->start_timer = ecore_timer_add(conf->tap.time_start, _e_gesture_timer_tap_start, NULL);
      }
    if (!taps->done_timer)
      {
-        taps->done_timer = ecore_timer_add(E_GESTURE_TAP_DONE_TIME, _e_gesture_timer_tap_done, NULL);
+        taps->done_timer = ecore_timer_add(conf->tap.time_done, _e_gesture_timer_tap_done, NULL);
      }
 }
 
@@ -958,8 +957,9 @@ static void
 _e_gesture_tap_done(void)
 {
    E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+   E_Gesture_Conf_Edd *conf = gesture->config->conf;
 
-   if (taps->repeats >= E_GESTURE_TAP_REPEATS_MAX)
+   if (taps->repeats >= conf->tap.repeats_max)
      _e_gesture_tap_cancel();
 
    if (!taps->fingers[taps->enabled_finger].enabled)
@@ -984,7 +984,7 @@ _e_gesture_tap_done(void)
           {
              if (!taps->interval_timer)
                {
-                  taps->interval_timer = ecore_timer_add(E_GESTURE_TAP_INTERVAL_TIME, _e_gesture_timer_tap_interval, NULL);
+                  taps->interval_timer = ecore_timer_add(conf->tap.time_interval, _e_gesture_timer_tap_interval, NULL);
                }
           }
      }
@@ -1048,6 +1048,7 @@ static void
 _e_gesture_process_tap_move(Ecore_Event_Mouse_Move *ev)
 {
    E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+   E_Gesture_Conf_Edd *conf = gesture->config->conf;
    Rect current_rect = {0, };
    int xx1, yy1, xx2, yy2;
 
@@ -1061,10 +1062,10 @@ _e_gesture_process_tap_move(Ecore_Event_Mouse_Move *ev)
    xx2 = taps->base_rect.x2 - current_rect.x2;
    yy2 = taps->base_rect.y2 - current_rect.y2;
 
-   if (ABS(xx1) > E_GESTURE_TAP_MOVING_RANGE ||
-       ABS(yy1) > E_GESTURE_TAP_MOVING_RANGE ||
-       ABS(xx2) > E_GESTURE_TAP_MOVING_RANGE ||
-       ABS(yy2) > E_GESTURE_TAP_MOVING_RANGE)
+   if (ABS(xx1) > conf->tap.moving_range ||
+       ABS(yy1) > conf->tap.moving_range ||
+       ABS(xx2) > conf->tap.moving_range ||
+       ABS(yy2) > conf->tap.moving_range)
      {
         GTDBG("%d finger moving too large diff: (%d, %d)(%d, %d)\n", ev->multi.device, xx1, yy1, xx2, yy2);
         _e_gesture_tap_cancel();
@@ -1347,7 +1348,7 @@ e_gesture_process_events(void *event, int type)
      {
         if (gesture->grabbed_gesture & TIZEN_GESTURE_TYPE_TAP ||
              ((gesture->grabbed_gesture & TIZEN_GESTURE_TYPE_EDGE_SWIPE) &&
-              gesture->gesture_events.edge_swipes.event_keep))
+              gesture->gesture_events.event_keep))
           gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
         gesture->gesture_filter = E_GESTURE_TYPE_ALL & ~gesture->grabbed_gesture;
      }
