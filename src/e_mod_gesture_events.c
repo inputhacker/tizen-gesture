@@ -139,7 +139,7 @@ _e_gesture_edge_swipe_cancel(void)
    edge_swipes->enabled_finger = 0x0;
    edge_swipes->edge = E_GESTURE_EDGE_NONE;
 
-   gesture->gesture_filter |= TIZEN_GESTURE_TYPE_EDGE_SWIPE;
+   gesture->gesture_filter |= E_GESTURE_TYPE_EDGE_SWIPE;
 }
 
 static void
@@ -236,7 +236,7 @@ _e_gesture_send_edge_swipe(int fingers, int x, int y, int edge, struct wl_client
 
 finish:
    _e_gesture_edge_swipe_cancel();
-   gesture->gesture_events.recognized_gesture |= TIZEN_GESTURE_TYPE_EDGE_SWIPE;
+   gesture->gesture_events.recognized_gesture |= E_GESTURE_TYPE_EDGE_SWIPE;
 }
 
 static E_Gesture_Event_State
@@ -449,9 +449,7 @@ _e_gesture_pan_send(int mode, int fingers, int cx, int cy, struct wl_resource *r
 
    GTINF("Send pan gesture %d fingers. (%d, %d) to client: %p, mode: %d\n", fingers, cx, cy, client, mode);
 
-   tizen_gesture_send_pan(res, mode, fingers, cx, cy);
-
-   gesture->gesture_events.recognized_gesture |= TIZEN_GESTURE_TYPE_PAN;
+   gesture->gesture_events.recognized_gesture |= E_GESTURE_TYPE_PAN;
 }
 
 static void
@@ -475,7 +473,7 @@ _e_gesture_pan_cancel(void)
                          pans->fingers[pans->num_pan_fingers].res,
                          pans->fingers[pans->num_pan_fingers].client);
 
-   gesture->gesture_filter |= TIZEN_GESTURE_TYPE_PAN;
+   gesture->gesture_filter |= E_GESTURE_TYPE_PAN;
    pans->state = E_GESTURE_PANPINCH_STATE_DONE;
 }
 
@@ -602,8 +600,8 @@ _e_gesture_process_pan_down(Ecore_Event_Mouse_Button *ev)
    E_Gesture_Event_Pan *pans = &gesture->gesture_events.pans;
 
    if (gesture->gesture_events.recognized_gesture &&
-       !((gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PAN) ||
-       (gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PINCH)))
+       !((gesture->gesture_events.recognized_gesture & E_GESTURE_TYPE_PAN) ||
+       (gesture->gesture_events.recognized_gesture & E_GESTURE_TYPE_PINCH)))
      _e_gesture_pan_cancel();
 
    if (gesture->gesture_events.num_pressed == 1)
@@ -622,8 +620,8 @@ _e_gesture_process_pan_move(Ecore_Event_Mouse_Move *ev)
    int idx, diff_x, diff_y, mode;
 
    if (gesture->gesture_events.recognized_gesture &&
-       !((gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PAN) ||
-       (gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PINCH)))
+       !((gesture->gesture_events.recognized_gesture & E_GESTURE_TYPE_PAN) ||
+       (gesture->gesture_events.recognized_gesture & E_GESTURE_TYPE_PINCH)))
      _e_gesture_pan_cancel();
 
    idx = gesture->gesture_events.num_pressed;
@@ -671,7 +669,6 @@ static void
 _e_gesture_pinch_send(int mode, int fingers, double distance, double angle, int cx, int cy, struct wl_resource *res, struct wl_client *client)
 {
    Ecore_Event_Mouse_Button *ev_cancel;
-   wl_fixed_t distance_fixed, angle_fixed;
 
    if (mode == TIZEN_GESTURE_MODE_BEGIN)
      {
@@ -686,12 +683,7 @@ _e_gesture_pinch_send(int mode, int fingers, double distance, double angle, int 
 
    GTINF("Send pinch gesture (fingers: %d, distance: %lf, angle: %lf, cx: %d, cy: %d) to client: %p, mode: %d\n", fingers, distance, angle, cx, cy, client, mode);
 
-   distance_fixed = wl_fixed_from_double(distance);
-   angle_fixed = wl_fixed_from_double(angle);
-
-   tizen_gesture_send_pinch(res, mode, fingers, distance_fixed, angle_fixed, cx, cy);
-
-   gesture->gesture_events.recognized_gesture |= TIZEN_GESTURE_TYPE_PINCH;
+   gesture->gesture_events.recognized_gesture |= E_GESTURE_TYPE_PINCH;
 }
 
 static void
@@ -715,7 +707,7 @@ _e_gesture_pinch_cancel(void)
                            pinchs->fingers[pinchs->num_pinch_fingers].res,
                            pinchs->fingers[pinchs->num_pinch_fingers].client);
 
-   gesture->gesture_filter |= TIZEN_GESTURE_TYPE_PINCH;
+   gesture->gesture_filter |= E_GESTURE_TYPE_PINCH;
    pinchs->state = E_GESTURE_PANPINCH_STATE_DONE;
 }
 
@@ -743,8 +735,8 @@ _e_gesture_process_pinch_down(Ecore_Event_Mouse_Button *ev)
    E_Gesture_Event_Pinch *pinch = &gesture->gesture_events.pinchs;
 
    if (gesture->gesture_events.recognized_gesture &&
-       !((gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PAN) ||
-       (gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PINCH)))
+       !((gesture->gesture_events.recognized_gesture & E_GESTURE_TYPE_PAN) ||
+       (gesture->gesture_events.recognized_gesture & E_GESTURE_TYPE_PINCH)))
      _e_gesture_pinch_cancel();
 
    if (gesture->gesture_events.num_pressed == 1)
@@ -763,8 +755,8 @@ _e_gesture_process_pinch_move(Ecore_Event_Mouse_Move *ev)
    double current_distance = 0.0, diff = 0.0, angle = 0.0;
 
    if (gesture->gesture_events.recognized_gesture &&
-       !((gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PAN) ||
-       (gesture->gesture_events.recognized_gesture & TIZEN_GESTURE_TYPE_PINCH)))
+       !((gesture->gesture_events.recognized_gesture & E_GESTURE_TYPE_PAN) ||
+       (gesture->gesture_events.recognized_gesture & E_GESTURE_TYPE_PINCH)))
      _e_gesture_pan_cancel();
 
    idx = gesture->gesture_events.num_pressed;
@@ -869,9 +861,9 @@ _e_gesture_tap_cancel(void)
    taps->base_rect.y1 = 0;
    taps->base_rect.x2 = 0;
    taps->base_rect.y2 = 0;
-   gesture->gesture_filter |= TIZEN_GESTURE_TYPE_TAP;
+   gesture->gesture_filter |= E_GESTURE_TYPE_TAP;
    _e_gesture_event_flush();
-   gesture->gesture_events.recognized_gesture &= ~TIZEN_GESTURE_TYPE_TAP;
+   gesture->gesture_events.recognized_gesture &= ~E_GESTURE_TYPE_TAP;
 }
 
 static void
@@ -880,7 +872,7 @@ _e_gesture_send_tap(int fingers, int repeats, struct wl_client *client, struct w
    GTINF("Send Tap gesture. %d fingers %d repeats to client (%p)\n", fingers, repeats, client);
    tizen_gesture_send_tap(res, TIZEN_GESTURE_MODE_DONE, fingers, repeats);
    _e_gesture_event_drop();
-   gesture->gesture_events.recognized_gesture |= TIZEN_GESTURE_TYPE_TAP;
+   gesture->gesture_events.recognized_gesture |= E_GESTURE_TYPE_TAP;
 
    _e_gesture_tap_cancel();
 }
@@ -928,7 +920,7 @@ _e_gesture_timer_tap_interval(void *data)
            taps->fingers[taps->enabled_finger].repeats[taps->repeats].client,
            taps->fingers[taps->enabled_finger].repeats[taps->repeats].res);
         gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
-        gesture->gesture_events.recognized_gesture &= ~TIZEN_GESTURE_TYPE_TAP;
+        gesture->gesture_events.recognized_gesture &= ~E_GESTURE_TYPE_TAP;
         gesture->gesture_filter = E_GESTURE_TYPE_ALL & ~gesture->grabbed_gesture;
      }
    else
@@ -972,7 +964,7 @@ _e_gesture_tap_done(void)
    if (!taps->fingers[taps->enabled_finger].enabled)
       _e_gesture_tap_cancel();
 
-   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_TAP) &&
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_TAP) &&
        gesture->gesture_events.num_pressed == 0)
      {
         taps->state = E_GESTURE_TAP_STATE_WAIT;
@@ -1162,19 +1154,19 @@ _e_gesture_process_mouse_button_down(void *event)
           }
      }
 
-   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_EDGE_SWIPE))
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_EDGE_SWIPE))
      {
         _e_gesture_process_edge_swipe_down(ev);
      }
-   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_PAN))
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_PAN))
      {
         _e_gesture_process_pan_down(ev);
      }
-   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_PINCH))
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_PINCH))
      {
         _e_gesture_process_pinch_down(ev);
      }
-   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_TAP))
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_TAP))
      {
         _e_gesture_process_tap_down(ev);
      }
@@ -1204,19 +1196,19 @@ _e_gesture_process_mouse_button_up(void *event)
    gesture->gesture_events.base_point[ev->multi.device + 1].axis.x = 0;
    gesture->gesture_events.base_point[ev->multi.device + 1].axis.y = 0;
 
-   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_EDGE_SWIPE))
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_EDGE_SWIPE))
      {
         _e_gesture_process_edge_swipe_up(ev);
      }
-   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_PAN))
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_PAN))
      {
         _e_gesture_process_pan_up(ev);
      }
-   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_PINCH))
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_PINCH))
      {
         _e_gesture_process_pinch_up(ev);
      }
-   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_TAP))
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_TAP))
      {
         _e_gesture_process_tap_up(ev);
      }
@@ -1263,19 +1255,19 @@ _e_gesture_process_mouse_move(void *event)
    gesture->gesture_events.base_point[ev->multi.device + 1].axis.x = ev->x;
    gesture->gesture_events.base_point[ev->multi.device + 1].axis.y = ev->y;
 
-   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_EDGE_SWIPE))
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_EDGE_SWIPE))
      {
         _e_gesture_process_edge_swipe_move(ev);
      }
-   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_PAN))
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_PAN))
      {
         _e_gesture_process_pan_move(ev);
      }
-   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_PINCH))
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_PINCH))
      {
         _e_gesture_process_pinch_move(ev);
      }
-   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_TAP))
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_TAP))
      {
         _e_gesture_process_tap_move(ev);
      }
@@ -1344,7 +1336,7 @@ _e_gesture_send_palm_cover(void)
    tizen_gesture_send_palm_cover(palm_covers->client_info.res, TIZEN_GESTURE_MODE_END, time, cx, cy);
 
    gesture->event_state = E_GESTURE_EVENT_STATE_IGNORE;
-   gesture->gesture_events.recognized_gesture |= TIZEN_GESTURE_TYPE_PALM_COVER;
+   gesture->gesture_events.recognized_gesture |= E_GESTURE_TYPE_PALM_COVER;
 }
 
 static void
@@ -1364,7 +1356,7 @@ _e_gesture_process_palm(int val)
    if (val <= 0) return;
    if (!gesture->grabbed_gesture) return;
 
-   if (!(gesture->gesture_filter & TIZEN_GESTURE_TYPE_PALM_COVER))
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_PALM_COVER))
      {
         _e_gesture_process_palm_cover(val);
      }
@@ -1430,8 +1422,8 @@ e_gesture_process_events(void *event, int type)
    if (gesture->gesture_events.num_pressed == 0&&
        type == ECORE_EVENT_MOUSE_BUTTON_UP)
      {
-        if (gesture->grabbed_gesture & TIZEN_GESTURE_TYPE_TAP ||
-             ((gesture->grabbed_gesture & TIZEN_GESTURE_TYPE_EDGE_SWIPE) &&
+        if (gesture->grabbed_gesture & E_GESTURE_TYPE_TAP ||
+             ((gesture->grabbed_gesture & E_GESTURE_TYPE_EDGE_SWIPE) &&
               gesture->gesture_events.event_keep))
           gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
         gesture->gesture_filter = E_GESTURE_TYPE_ALL & ~gesture->grabbed_gesture;
