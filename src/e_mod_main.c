@@ -83,7 +83,7 @@ e_gesture_add_client_destroy_listener(struct wl_client *client, int mode, int fi
 
    gesture->grab_client_list = eina_list_append(gesture->grab_client_list, grabbed_client);
 
-   return TIZEN_KEYROUTER_ERROR_NONE;
+   return TIZEN_GESTURE_ERROR_NONE;
 }
 
 static void
@@ -819,7 +819,7 @@ _e_gesture_cb_destory(struct wl_resource *resource)
    /* TODO : destroy resources if exist */
 }
 
-/* tizen_keyrouter global object bind function */
+/* tizen_gesture global object bind function */
 static void
 _e_gesture_cb_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
 {
