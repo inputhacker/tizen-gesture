@@ -1356,8 +1356,10 @@ _e_gesture_send_palm_cover(void)
 {
    Ecore_Event_Mouse_Button *ev_cancel;
    E_Gesture_Event_Palm_Cover *palm_covers = &gesture->gesture_events.palm_covers;
-   int time;
+   int duration = 0, time;
    int cx = 0, cy = 0;
+   unsigned int size = 0;
+   wl_fixed_t pressure;
 
    time = (int)(ecore_time_get()*1000);
 
@@ -1380,8 +1382,10 @@ _e_gesture_send_palm_cover(void)
 
    GTINF("Send palm_cover gesture to client: %p\n", palm_covers->client_info.client);
 
-   tizen_gesture_send_palm_cover(palm_covers->client_info.res, TIZEN_GESTURE_MODE_BEGIN, time, cx, cy);
-   tizen_gesture_send_palm_cover(palm_covers->client_info.res, TIZEN_GESTURE_MODE_END, time, cx, cy);
+   pressure = wl_fixed_from_double(0.0);
+
+   tizen_gesture_send_palm_cover(palm_covers->client_info.res, TIZEN_GESTURE_MODE_BEGIN, duration, size, pressure, cx, cy);
+   tizen_gesture_send_palm_cover(palm_covers->client_info.res, TIZEN_GESTURE_MODE_END, duration, size, pressure, cx, cy);
 
    gesture->event_state = E_GESTURE_EVENT_STATE_IGNORE;
    gesture->gesture_events.recognized_gesture |= E_GESTURE_TYPE_PALM_COVER;
