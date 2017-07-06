@@ -85,7 +85,6 @@ typedef enum _E_Gesture_PanPinch_State E_Gesture_PanPinch_State;
 extern E_GesturePtr gesture;
 
 #define E_GESTURE_EDGE_MAX 4
-#define E_GESTURE_EDGE_ALL (TIZEN_GESTURE_EDGE_TOP | TIZEN_GESTURE_EDGE_RIGHT | TIZEN_GESTURE_EDGE_BOTTOM | TIZEN_GESTURE_EDGE_LEFT)
 
 enum _E_Gesture_Edge
 {
@@ -93,8 +92,9 @@ enum _E_Gesture_Edge
    E_GESTURE_EDGE_TOP,
    E_GESTURE_EDGE_RIGHT,
    E_GESTURE_EDGE_BOTTOM,
-   E_GESTURE_EDGE_LEFT
+   E_GESTURE_EDGE_LEFT,
 };
+#define E_GESTURE_EDGE_ALL ((1 << E_GESTURE_EDGE_TOP) | (1 << E_GESTURE_EDGE_RIGHT) | (1 << E_GESTURE_EDGE_BOTTOM) | (1 << E_GESTURE_EDGE_LEFT))
 
 enum _E_Gesture_Event_State
 {
@@ -196,13 +196,15 @@ struct _E_Gesture_Event_Edge_Swipe_Finger_Edge
 {
    struct wl_client *client;
    struct wl_resource *res;
+   unsigned int sp;
+   unsigned int ep;
 };
 
 struct _E_Gesture_Event_Edge_Swipe_Finger
 {
    Coords start;
    Eina_Bool enabled;
-   E_Gesture_Event_Edge_Swipe_Finger_Edge edge[E_GESTURE_EDGE_MAX + 1];
+   Eina_List *edge[E_GESTURE_EDGE_MAX + 1];
 };
 
 struct _E_Gesture_Event_Edge_Swipe

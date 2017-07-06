@@ -185,27 +185,14 @@ _e_gesture_send_back_key(Eina_Bool pressed)
 }
 
 static void
-_e_gesture_send_edge_swipe(int fingers, int x, int y, int edge, struct wl_client *client, struct wl_resource *res)
+_e_gesture_send_edge_swipe(int fingers, int x, int y, int edge)
 {
-   enum tizen_gesture_edge dir = 0;
    Ecore_Event_Mouse_Button *ev_cancel;
    E_Gesture_Conf_Edd *conf = gesture->config->conf;
-
-   switch (edge)
-     {
-        case E_GESTURE_EDGE_TOP:
-           dir = TIZEN_GESTURE_EDGE_TOP;
-           break;
-        case E_GESTURE_EDGE_LEFT:
-           dir = TIZEN_GESTURE_EDGE_LEFT;
-           break;
-        case E_GESTURE_EDGE_BOTTOM:
-           dir = TIZEN_GESTURE_EDGE_BOTTOM;
-           break;
-        case E_GESTURE_EDGE_RIGHT:
-           dir = TIZEN_GESTURE_EDGE_RIGHT;
-           break;
-     }
+   Eina_List *l;
+   E_Gesture_Event_Edge_Swipe_Finger_Edge *edata;
+   E_Gesture_Event_Edge_Swipe *edge_swipes = &gesture->gesture_events.edge_swipes;
+   int bp = -1;
 
    if (gesture->gesture_events.event_keep)
      {
@@ -222,8 +209,6 @@ _e_gesture_send_edge_swipe(int fingers, int x, int y, int edge, struct wl_client
         ecore_event_add(ECORE_EVENT_MOUSE_BUTTON_CANCEL, ev_cancel, NULL, NULL);
      }
 
-   GTINF("Send edge_swipe gesture (edge: %d) to client: %p\n", dir, client);
-
    if (conf->edge_swipe.default_enable_back &&
        edge == E_GESTURE_EDGE_TOP)
      {
@@ -231,8 +216,27 @@ _e_gesture_send_edge_swipe(int fingers, int x, int y, int edge, struct wl_client
         _e_gesture_send_back_key(EINA_FALSE);
         goto finish;
      }
-   
-   tizen_gesture_send_edge_swipe(res, fingers, TIZEN_GESTURE_MODE_DONE, x, y, dir);
+
+   if (edge == TIZEN_GESTURE_EDGE_TOP ||
+       edge == TIZEN_GESTURE_EDGE_BOTTOM)
+     {
+        bp = x;
+     }
+   else if (edge == TIZEN_GESTURE_EDGE_RIGHT ||
+       edge == TIZEN_GESTURE_EDGE_LEFT)
+     {
+        bp = y;
+     }
+
+   EINA_LIST_FOREACH(edge_swipes->fingers[fingers].edge[edge], l, edata)
+     {
+        if (bp >= edata->sp && bp <= edata->ep)
+          {
+             GTINF("Send edge_swipe gesture (fingers: %d, edge: %d) to client: %p\n", fingers, edge, edata->client);
+             tizen_gesture_send_edge_swipe(edata->res, TIZEN_GESTURE_MODE_DONE, fingers, x, y, edge);
+             break;
+          }
+     }
 
 finish:
    _e_gesture_edge_swipe_cancel();
@@ -252,6 +256,52 @@ _e_gesture_process_device_del(void *event)
 }
 
 static Eina_Bool
+_e_gesture_event_edge_swipe_edge_check(unsigned int edge)
+{
+   E_Gesture_Event_Edge_Swipe *edge_swipes = &gesture->gesture_events.edge_swipes;
+   int idx = gesture->gesture_events.num_pressed;
+   E_Gesture_Conf_Edd *conf = gesture->config->conf;
+   Eina_List *l;
+   E_Gesture_Event_Edge_Swipe_Finger_Edge *edata;
+   Coords coords;
+
+   if ((conf->edge_swipe.default_enable_back) &&
+       (edge == TIZEN_GESTURE_EDGE_TOP ||
+       ((edge_swipes->combined_keycode == conf->edge_swipe.compose_key) &&
+       (edge_swipes->edge == TIZEN_GESTURE_EDGE_LEFT))))
+     {
+        return EINA_TRUE;
+     }
+
+   coords.x = edge_swipes->fingers[idx].start.x;
+   coords.y = edge_swipes->fingers[idx].start.y;
+
+   EINA_LIST_FOREACH(edge_swipes->fingers[idx].edge[edge], l, edata)
+     {
+        if (edge == TIZEN_GESTURE_EDGE_TOP ||
+            edge == TIZEN_GESTURE_EDGE_BOTTOM)
+          {
+             if ((coords.x >= edata->sp) &&
+                 (coords.x <= edata->ep))
+               {
+                  return EINA_TRUE;
+               }
+          }
+        else if ((edge == TIZEN_GESTURE_EDGE_LEFT) ||
+                 (edge == TIZEN_GESTURE_EDGE_RIGHT))
+          {
+             if (coords.y >= edata->sp &&
+                 coords.y <= edata->ep)
+               {
+                  return EINA_TRUE;
+               }
+          }
+     }
+
+   return EINA_FALSE;
+}
+
+static Eina_Bool
 _e_gesture_timer_edge_swipe_start(void *data)
 {
    E_Gesture_Event_Edge_Swipe *edge_swipes = &gesture->gesture_events.edge_swipes;
@@ -264,10 +314,8 @@ _e_gesture_timer_edge_swipe_start(void *data)
      {
         edge_swipes->enabled_finger &= ~(1 << i);
      }
-   if ((edge_swipes->edge == E_GESTURE_EDGE_TOP && !edge_swipes->fingers[idx].edge[E_GESTURE_EDGE_TOP].client) ||
-       (edge_swipes->edge == E_GESTURE_EDGE_LEFT && !edge_swipes->fingers[idx].edge[E_GESTURE_EDGE_LEFT].client) ||
-       (edge_swipes->edge == E_GESTURE_EDGE_BOTTOM && !edge_swipes->fingers[idx].edge[E_GESTURE_EDGE_BOTTOM].client) ||
-       (edge_swipes->edge == E_GESTURE_EDGE_RIGHT && !edge_swipes->fingers[idx].edge[E_GESTURE_EDGE_RIGHT].client))
+   if ((edge_swipes->enabled_finger == 0x0) ||
+       (_e_gesture_event_edge_swipe_edge_check(edge_swipes->edge) == EINA_FALSE))
      {
         if (gesture->gesture_events.event_keep)
           _e_gesture_event_flush();
@@ -303,7 +351,7 @@ _e_gesture_process_edge_swipe_down(Ecore_Event_Mouse_Button *ev)
 
    if (gesture->gesture_events.num_pressed == 1)
      {
-        for (i = 0; i < E_GESTURE_FINGER_MAX+1; i++)
+        for (i = 1; i < E_GESTURE_FINGER_MAX+1; i++)
           {
              if (edge_swipes->fingers[i].enabled)
                {
@@ -316,11 +364,11 @@ _e_gesture_process_edge_swipe_down(Ecore_Event_Mouse_Button *ev)
         else if (ev->y > e_comp->h - conf->edge_swipe.area_offset)
           edge_swipes->edge = E_GESTURE_EDGE_BOTTOM;
         else if (ev->x < conf->edge_swipe.area_offset)
-          edge_swipes->edge = E_GESTURE_EDGE_RIGHT;
-        else if (ev->x > e_comp->w - conf->edge_swipe.area_offset)
           edge_swipes->edge = E_GESTURE_EDGE_LEFT;
+        else if (ev->x > e_comp->w - conf->edge_swipe.area_offset)
+          edge_swipes->edge = E_GESTURE_EDGE_RIGHT;
 
-        if (!((1 << (edge_swipes->edge - 1)) & edge_swipes->enabled_edge))
+        if (!((1 << (edge_swipes->edge)) & edge_swipes->enabled_edge))
           edge_swipes->edge = E_GESTURE_EDGE_NONE;
 
         if (edge_swipes->edge != E_GESTURE_EDGE_NONE)
@@ -375,7 +423,7 @@ _e_gesture_process_edge_swipe_move(Ecore_Event_Mouse_Move *ev)
              }
            if (diff.y > conf->edge_swipe.max_length)
              {
-                _e_gesture_send_edge_swipe(idx, edge_swipes->fingers[idx].start.x, edge_swipes->fingers[idx].start.y, edge_swipes->edge, edge_swipes->fingers[idx].edge[E_GESTURE_EDGE_TOP].client, edge_swipes->fingers[idx].edge[E_GESTURE_EDGE_TOP].res);
+                _e_gesture_send_edge_swipe(idx, edge_swipes->fingers[idx].start.x, edge_swipes->fingers[idx].start.y, E_GESTURE_EDGE_TOP);
              }
            break;
         case E_GESTURE_EDGE_LEFT:
@@ -388,7 +436,7 @@ _e_gesture_process_edge_swipe_move(Ecore_Event_Mouse_Move *ev)
              }
            if (diff.x > conf->edge_swipe.max_length)
              {
-                _e_gesture_send_edge_swipe(idx, edge_swipes->fingers[idx].start.x, edge_swipes->fingers[idx].start.y, edge_swipes->edge, edge_swipes->fingers[idx].edge[E_GESTURE_EDGE_LEFT].client, edge_swipes->fingers[idx].edge[E_GESTURE_EDGE_LEFT].res);
+                _e_gesture_send_edge_swipe(idx, edge_swipes->fingers[idx].start.x, edge_swipes->fingers[idx].start.y, E_GESTURE_EDGE_LEFT);
              }
            break;
         case E_GESTURE_EDGE_BOTTOM:
@@ -401,7 +449,7 @@ _e_gesture_process_edge_swipe_move(Ecore_Event_Mouse_Move *ev)
              }
            if (diff.y > conf->edge_swipe.max_length)
              {
-                _e_gesture_send_edge_swipe(idx, edge_swipes->fingers[idx].start.x, edge_swipes->fingers[idx].start.y, edge_swipes->edge, edge_swipes->fingers[idx].edge[E_GESTURE_EDGE_BOTTOM].client, edge_swipes->fingers[idx].edge[E_GESTURE_EDGE_BOTTOM].res);
+                _e_gesture_send_edge_swipe(idx, edge_swipes->fingers[idx].start.x, edge_swipes->fingers[idx].start.y, E_GESTURE_EDGE_BOTTOM);
              }
            break;
         case E_GESTURE_EDGE_RIGHT:
@@ -414,7 +462,7 @@ _e_gesture_process_edge_swipe_move(Ecore_Event_Mouse_Move *ev)
              }
            if (diff.x > conf->edge_swipe.max_length)
              {
-                _e_gesture_send_edge_swipe(idx, edge_swipes->fingers[idx].start.x, edge_swipes->fingers[idx].start.y, edge_swipes->edge, edge_swipes->fingers[idx].edge[E_GESTURE_EDGE_RIGHT].client, edge_swipes->fingers[idx].edge[E_GESTURE_EDGE_RIGHT].res);
+                _e_gesture_send_edge_swipe(idx, edge_swipes->fingers[idx].start.x, edge_swipes->fingers[idx].start.y, E_GESTURE_EDGE_RIGHT);
              }
            break;
         default:
