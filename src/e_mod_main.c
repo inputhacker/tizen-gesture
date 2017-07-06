@@ -677,6 +677,34 @@ notify:
 }
 
 static void
+_e_gesture_cb_grab_edge_drag(struct wl_client *client,
+                        struct wl_resource *resouce,
+                        uint32_t fingers, uint32_t edge, uint32_t edge_size,
+                        uint32_t start_point, uint32_t end_point)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = TIZEN_GESTURE_ERROR_NOT_SUPPORTED;
+
+   tizen_gesture_send_grab_edge_swipe_notify(resouce, fingers, edge, edge_size, start_point, end_point, ret);
+}
+
+static void
+_e_gesture_cb_ungrab_edge_drag(struct wl_client *client,
+                          struct wl_resource *resouce,
+                          uint32_t fingers, uint32_t edge, uint32_t edge_size,
+                          uint32_t start_point, uint32_t end_point)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = TIZEN_GESTURE_ERROR_NOT_SUPPORTED;
+
+   tizen_gesture_send_grab_edge_swipe_notify(resouce, fingers, edge, edge_size, start_point, end_point, ret);
+}
+
+
+
+static void
 _e_gesture_cb_grab_tap(struct wl_client *client,
                    struct wl_resource *resource,
                    uint32_t fingers, uint32_t repeats)
@@ -774,7 +802,7 @@ _e_gesture_cb_grab_palm_cover(struct wl_client *client,
 
    ret = _e_gesture_grab_palm_cover(client, resource);
 
-   tizen_gesture_send_palm_cover_notify(resource, ret);
+   tizen_gesture_send_palm_cover_notify(resource, NULL, ret);
 }
 
 static void
@@ -785,16 +813,58 @@ _e_gesture_cb_ungrab_palm_cover(struct wl_client *client,
 
    ret = _e_gesture_ungrab_palm_cover(client, resource);
 
-   tizen_gesture_send_palm_cover_notify(resource, ret);
+   tizen_gesture_send_palm_cover_notify(resource, NULL, ret);
+}
+
+static void
+_e_gesture_cb_select_palm_cover(struct wl_client *client,
+                                struct wl_resource *resource,
+                                struct wl_resource *surface)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = TIZEN_GESTURE_ERROR_NOT_SUPPORTED;
+
+   tizen_gesture_send_palm_cover_notify(resource, surface, ret);
+}
+
+static void
+_e_gesture_cb_deselect_palm_cover(struct wl_client *client,
+                                struct wl_resource *resource,
+                                struct wl_resource *surface)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = TIZEN_GESTURE_ERROR_NOT_SUPPORTED;
+
+   tizen_gesture_send_palm_cover_notify(resource, surface, ret);
+}
+
+static void
+_e_gesture_cb_activate_set(struct wl_client *client,
+                           struct wl_resource *resource,
+                           struct wl_resource *surface,
+                           uint32_t type, uint32_t active)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = TIZEN_GESTURE_ERROR_NOT_SUPPORTED;
+
+   tizen_gesture_send_activate_notify(resource, surface, type, active, ret);
 }
 
 static const struct tizen_gesture_interface _e_gesture_implementation = {
    _e_gesture_cb_grab_edge_swipe,
    _e_gesture_cb_ungrab_edge_swipe,
+   _e_gesture_cb_grab_edge_drag,
+   _e_gesture_cb_ungrab_edge_drag,
    _e_gesture_cb_grab_tap,
    _e_gesture_cb_ungrab_tap,
    _e_gesture_cb_grab_palm_cover,
-   _e_gesture_cb_ungrab_palm_cover
+   _e_gesture_cb_ungrab_palm_cover,
+   _e_gesture_cb_select_palm_cover,
+   _e_gesture_cb_deselect_palm_cover,
+   _e_gesture_cb_activate_set,
 };
 
 /* tizen_gesture global object destroy function */

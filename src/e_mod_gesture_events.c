@@ -1360,6 +1360,7 @@ _e_gesture_send_palm_cover(void)
    int cx = 0, cy = 0;
    unsigned int size = 0;
    wl_fixed_t pressure;
+   struct wl_resource *surface = NULL;
 
    time = (int)(ecore_time_get()*1000);
 
@@ -1384,8 +1385,8 @@ _e_gesture_send_palm_cover(void)
 
    pressure = wl_fixed_from_double(0.0);
 
-   tizen_gesture_send_palm_cover(palm_covers->client_info.res, TIZEN_GESTURE_MODE_BEGIN, duration, size, pressure, cx, cy);
-   tizen_gesture_send_palm_cover(palm_covers->client_info.res, TIZEN_GESTURE_MODE_END, duration, size, pressure, cx, cy);
+   tizen_gesture_send_palm_cover(palm_covers->client_info.res, surface, TIZEN_GESTURE_MODE_BEGIN, duration, size, pressure, cx, cy);
+   tizen_gesture_send_palm_cover(palm_covers->client_info.res, surface, TIZEN_GESTURE_MODE_END, duration, size, pressure, cx, cy);
 
    gesture->event_state = E_GESTURE_EVENT_STATE_IGNORE;
    gesture->gesture_events.recognized_gesture |= E_GESTURE_TYPE_PALM_COVER;
