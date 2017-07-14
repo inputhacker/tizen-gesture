@@ -617,6 +617,16 @@ _e_gesture_util_rect_get(int finger, int *x1, int *y1, int *x2, int *y2)
      }
 }
 
+static struct wl_resource *
+_e_gesture_util_eclient_surface_get(E_Client *ec)
+{
+   if (!ec) return NULL;
+   if (e_object_is_del(E_OBJECT(ec))) return NULL;
+   if (!ec->comp_data) return NULL;
+
+   return ec->comp_data->surface;
+}
+
 static Eina_Bool
 _e_gesture_timer_pan_start(void *data)
 {
@@ -1360,7 +1370,9 @@ _e_gesture_send_palm_cover(void)
    int cx = 0, cy = 0;
    unsigned int size = 0;
    wl_fixed_t pressure;
-   struct wl_resource *surface = NULL;
+   struct wl_resource *surface = NULL, *res = NULL, *focus_surface = NULL;
+   Eina_List *l;
+   E_Gesture_Select_Surface *sdata;
 
    time = (int)(ecore_time_get()*1000);
 
@@ -1384,6 +1396,26 @@ _e_gesture_send_palm_cover(void)
    GTINF("Send palm_cover gesture to client: %p\n", palm_covers->client_info.client);
 
    pressure = wl_fixed_from_double(0.0);
+
+   focus_surface = _e_gesture_util_eclient_surface_get(e_client_focused_get());
+   if (focus_surface)
+     {
+        EINA_LIST_FOREACH(palm_covers->select_surface_list, l, sdata)
+          {
+             if (focus_surface == sdata->surface)
+               {
+                  surface = sdata->surface;
+                  res = sdata->res;
+                  break;
+               }
+          }
+     }
+
+   if (!surface || !res)
+     {
+        res = palm_covers->client_info.res;
+        surface = NULL;
+     }
 
    tizen_gesture_send_palm_cover(palm_covers->client_info.res, surface, TIZEN_GESTURE_MODE_BEGIN, duration, size, pressure, cx, cy);
    tizen_gesture_send_palm_cover(palm_covers->client_info.res, surface, TIZEN_GESTURE_MODE_END, duration, size, pressure, cx, cy);

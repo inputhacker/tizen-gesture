@@ -9,6 +9,7 @@ E_API E_Module_Api e_modapi = { E_MODULE_API_VERSION, "Gesture Module of Window 
 static E_Gesture_Config_Data *_e_gesture_init(E_Module *m);
 static void _e_gesture_init_handlers(void);
 static void _e_gesture_wl_client_cb_destroy(struct wl_listener *l, void *data);
+static void _e_gesture_wl_surface_cb_destroy(struct wl_listener *l, void *data);
 
 static Eina_Bool
 _e_gesture_edge_swipe_boundary_check(E_Gesture_Event_Edge_Swipe_Finger *fingers, unsigned int edge, int sp, int ep)
@@ -227,14 +228,11 @@ _e_gesture_remove_client_destroy_listener(struct wl_client *client, unsigned int
                   data->grabbed_gesture &= ~E_GESTURE_TYPE_EDGE_SWIPE;
                   for (i = 0; i < E_GESTURE_FINGER_MAX+1; i++)
                     {
-                       if (data->edge_swipe_fingers[i].enabled ||
-                           data->edge_swipe_fingers[i].enabled ||
-                           data->edge_swipe_fingers[i].enabled ||
-                           data->edge_swipe_fingers[i].enabled)
-                            {
-                               data->grabbed_gesture |= E_GESTURE_TYPE_EDGE_SWIPE;
-                               break;
-                            }
+                       if (data->edge_swipe_fingers[i].enabled)
+                         {
+                            data->grabbed_gesture |= E_GESTURE_TYPE_EDGE_SWIPE;
+                            break;
+                         }
                     }
                }
 
@@ -490,6 +488,131 @@ _e_gesture_ungrab_palm_cover(struct wl_client *client, struct wl_resource *resou
 
    return ret;
 }
+
+static int
+_e_gesture_add_surface_destroy_listener(struct wl_resource *surface, int type)
+{
+   struct wl_listener *destroy_listener = NULL;
+   Eina_List *l;
+   struct wl_resource *surface_data;
+
+   EINA_SAFETY_ON_NULL_RETURN_VAL(surface, TIZEN_GESTURE_ERROR_INVALID_DATA);
+   if (type != E_GESTURE_TYPE_PALM_COVER)
+     return TIZEN_GESTURE_ERROR_INVALID_DATA;
+
+   EINA_LIST_FOREACH(gesture->select_surface_list, l, surface_data)
+     {
+        if (surface_data == surface)
+          {
+             return TIZEN_GESTURE_ERROR_NONE;
+          }
+     }
+
+   destroy_listener = E_NEW(struct wl_listener, 1);
+   if (!destroy_listener)
+     {
+        GTERR("Failed to allocate memory for wl_client destroy listener !\n");
+        return TIZEN_GESTURE_ERROR_NO_SYSTEM_RESOURCES;
+     }
+
+   destroy_listener->notify = _e_gesture_wl_surface_cb_destroy;
+   wl_resource_add_destroy_listener(surface, destroy_listener);
+
+   gesture->select_surface_list = eina_list_append(gesture->select_surface_list, surface);
+
+   return TIZEN_GESTURE_ERROR_NONE;
+}
+
+
+static int
+_e_gesture_select_palm_cover(struct wl_client *client, struct wl_resource *resource,
+                             struct wl_resource *surface)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+   Eina_List *l;
+   E_Gesture_Event_Palm_Cover *palm_covers = &gesture->gesture_events.palm_covers;
+   E_Gesture_Select_Surface *sdata;
+
+   EINA_LIST_FOREACH(palm_covers->select_surface_list, l, sdata)
+     {
+        if (sdata->surface == surface)
+          {
+             ret = TIZEN_GESTURE_ERROR_GRABBED_ALREADY;
+             goto out;
+          }
+     }
+
+   sdata = E_NEW(E_Gesture_Select_Surface, 1);
+   if (!sdata)
+     {
+        ret = TIZEN_GESTURE_ERROR_NO_SYSTEM_RESOURCES;
+        goto out;
+     }
+
+   sdata->surface = surface;
+   sdata->res = resource;
+
+   palm_covers->select_surface_list = eina_list_append(palm_covers->select_surface_list, sdata);
+
+   _e_gesture_add_surface_destroy_listener(surface, E_GESTURE_TYPE_PALM_COVER);
+
+out:
+   return ret;
+}
+
+static void
+_e_gesture_remove_surface_destroy_listener(struct wl_resource *surface, int type)
+{
+   Eina_List *l, *l_next;
+   struct wl_resource *surface_data;
+   struct wl_listener *destroy_listener;
+
+   EINA_SAFETY_ON_NULL_RETURN(surface);
+   if (type != E_GESTURE_TYPE_PALM_COVER) return;
+
+   destroy_listener = wl_resource_get_destroy_listener(surface, _e_gesture_wl_surface_cb_destroy);
+   if (!destroy_listener)
+     {
+        GTWRN("surface(%p) is not gesture selected surface\n", surface);
+     }
+
+   EINA_LIST_FOREACH_SAFE(gesture->select_surface_list, l, l_next, surface_data)
+     {
+        if (surface_data == surface)
+          {
+             gesture->select_surface_list = eina_list_remove_list(gesture->select_surface_list, l);
+             break;
+          }
+     }
+
+   wl_list_remove(&destroy_listener->link);
+   E_FREE(destroy_listener);
+}
+
+static int
+_e_gesture_deselect_palm_cover(struct wl_client *client, struct wl_resource *resource,
+                             struct wl_resource *surface)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+   Eina_List *l, *l_next;
+   E_Gesture_Event_Palm_Cover *palm_covers = &gesture->gesture_events.palm_covers;
+   E_Gesture_Select_Surface *sdata;
+
+   EINA_LIST_FOREACH_SAFE(palm_covers->select_surface_list, l, l_next, sdata)
+     {
+        if (sdata->surface == surface)
+          {
+             palm_covers->select_surface_list = eina_list_remove_list(palm_covers->select_surface_list, l);
+             E_FREE(sdata);
+             break;
+          }
+     }
+
+   _e_gesture_remove_surface_destroy_listener(surface, E_GESTURE_TYPE_PALM_COVER);
+
+   return ret;
+}
+
 
 static void
 _e_gesture_cb_grab_edge_swipe(struct wl_client *client,
@@ -823,7 +946,7 @@ _e_gesture_cb_select_palm_cover(struct wl_client *client,
 {
    int ret = TIZEN_GESTURE_ERROR_NONE;
 
-   ret = TIZEN_GESTURE_ERROR_NOT_SUPPORTED;
+   ret = _e_gesture_select_palm_cover(client, resource, surface);
 
    tizen_gesture_send_palm_cover_notify(resource, surface, ret);
 }
@@ -835,7 +958,7 @@ _e_gesture_cb_deselect_palm_cover(struct wl_client *client,
 {
    int ret = TIZEN_GESTURE_ERROR_NONE;
 
-   ret = TIZEN_GESTURE_ERROR_NOT_SUPPORTED;
+   ret = _e_gesture_deselect_palm_cover(client, resource, surface);
 
    tizen_gesture_send_palm_cover_notify(resource, surface, ret);
 }
@@ -1315,6 +1438,36 @@ _e_gesture_wl_client_cb_destroy(struct wl_listener *l, void *data)
      }
 
    gesture->gesture_filter = E_GESTURE_TYPE_ALL & ~gesture->grabbed_gesture;
+}
+
+static void
+_e_gesture_wl_surface_cb_destroy(struct wl_listener *l, void *data)
+{
+   struct wl_resource *surface = (struct wl_resource *)data;
+   E_Gesture_Event_Palm_Cover *palm_covers = &gesture->gesture_events.palm_covers;
+   Eina_List *list, *l_next;
+   struct wl_resource *surface_data;
+   E_Gesture_Select_Surface *sdata;
+
+   EINA_LIST_FOREACH_SAFE(gesture->select_surface_list, list, l_next, surface_data)
+     {
+        if (surface_data == surface)
+          {
+             gesture->select_surface_list = eina_list_remove_list(gesture->select_surface_list, list);
+          }
+     }
+
+   EINA_LIST_FOREACH_SAFE(palm_covers->select_surface_list, list, l_next, sdata)
+     {
+        if (sdata->surface == surface)
+          {
+             palm_covers->select_surface_list = eina_list_remove_list(palm_covers->select_surface_list, list);
+             E_FREE(sdata);
+          }
+     }
+
+   wl_list_remove(&l->link);
+   E_FREE(l);
 }
 
 void

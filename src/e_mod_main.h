@@ -77,6 +77,7 @@ typedef struct _Rect Rect;
 typedef struct _E_Gesture_Finger E_Gesture_Finger;
 typedef struct _E_Gesture_Event_Info E_Gesture_Event_Info;
 typedef struct _E_Gesture_Event_Client E_Gesture_Event_Client;
+typedef struct _E_Gesture_Select_Surface E_Gesture_Select_Surface;
 
 typedef enum _E_Gesture_Edge E_Gesture_Edge;
 typedef enum _E_Gesture_Event_State E_Gesture_Event_State;
@@ -193,6 +194,12 @@ struct _E_Gesture_Event_Client
    struct wl_resource *res;
 };
 
+struct _E_Gesture_Select_Surface
+{
+   struct wl_resource *surface;
+   struct wl_resource *res;
+};
+
 struct _E_Gesture_Event_Edge_Swipe_Finger_Edge
 {
    struct wl_client *client;
@@ -282,6 +289,7 @@ struct _E_Gesture_Event_Pinch
 struct _E_Gesture_Event_Palm_Cover
 {
    E_Gesture_Event_Client client_info;
+   Eina_List *select_surface_list;
    unsigned int start_time;
 };
 
@@ -323,6 +331,7 @@ struct _E_Gesture
    Ecore_Event_Filter *ef_handler;
    Eina_List *handlers;
    Eina_List *grab_client_list;
+   Eina_List *select_surface_list;
    Eina_List *hooks;
 
    struct
