@@ -346,6 +346,8 @@ _e_gesture_process_edge_swipe_down(Ecore_Event_Mouse_Button *ev)
    int i;
    unsigned int idx = ev->multi.device+1;
 
+   if (!edge_swipes->activation.active) return;
+
    if (gesture->gesture_events.recognized_gesture)
      _e_gesture_edge_swipe_cancel();
 
@@ -404,6 +406,8 @@ _e_gesture_process_edge_swipe_move(Ecore_Event_Mouse_Move *ev)
    E_Gesture_Conf_Edd *conf = gesture->config->conf;
    Coords diff;
    unsigned int idx = ev->multi.device+1;
+
+   if (!edge_swipes->activation.active) return;
 
    if (!(edge_swipes->enabled_finger & (1 << idx)))
      return;
@@ -474,6 +478,9 @@ _e_gesture_process_edge_swipe_move(Ecore_Event_Mouse_Move *ev)
 static void
 _e_gesture_process_edge_swipe_up(Ecore_Event_Mouse_Button *ev)
 {
+   E_Gesture_Event_Edge_Swipe *edge_swipes = &gesture->gesture_events.edge_swipes;
+
+   if (!edge_swipes->activation.active) return;
    if (gesture->gesture_events.event_keep)
      _e_gesture_event_flush();
    _e_gesture_edge_swipe_cancel();
@@ -657,6 +664,8 @@ _e_gesture_process_pan_down(Ecore_Event_Mouse_Button *ev)
 {
    E_Gesture_Event_Pan *pans = &gesture->gesture_events.pans;
 
+   if (!pans->activation.active) return;
+
    if (gesture->gesture_events.recognized_gesture &&
        !((gesture->gesture_events.recognized_gesture & E_GESTURE_TYPE_PAN) ||
        (gesture->gesture_events.recognized_gesture & E_GESTURE_TYPE_PINCH)))
@@ -676,6 +685,8 @@ _e_gesture_process_pan_move(Ecore_Event_Mouse_Move *ev)
    E_Gesture_Event_Pan *pans = &gesture->gesture_events.pans;
    Coords cur_point = {0,};
    int idx, diff_x, diff_y, mode;
+
+   if (!pans->activation.active) return;
 
    if (gesture->gesture_events.recognized_gesture &&
        !((gesture->gesture_events.recognized_gesture & E_GESTURE_TYPE_PAN) ||
@@ -720,6 +731,9 @@ _e_gesture_process_pan_move(Ecore_Event_Mouse_Move *ev)
 static void
 _e_gesture_process_pan_up(Ecore_Event_Mouse_Button *ev)
 {
+   E_Gesture_Event_Pan *pans = &gesture->gesture_events.pans;
+
+   if (!pans->activation.active) return;
    _e_gesture_pan_cancel();
 }
 
@@ -792,6 +806,8 @@ _e_gesture_process_pinch_down(Ecore_Event_Mouse_Button *ev)
 {
    E_Gesture_Event_Pinch *pinch = &gesture->gesture_events.pinchs;
 
+   if (!pinch->activation.active) return;
+
    if (gesture->gesture_events.recognized_gesture &&
        !((gesture->gesture_events.recognized_gesture & E_GESTURE_TYPE_PAN) ||
        (gesture->gesture_events.recognized_gesture & E_GESTURE_TYPE_PINCH)))
@@ -811,6 +827,8 @@ _e_gesture_process_pinch_move(Ecore_Event_Mouse_Move *ev)
    E_Gesture_Event_Pinch *pinch = &gesture->gesture_events.pinchs;
    int idx, mode, cx = 0, cy = 0;
    double current_distance = 0.0, diff = 0.0, angle = 0.0;
+
+   if (!pinch->activation.active) return;
 
    if (gesture->gesture_events.recognized_gesture &&
        !((gesture->gesture_events.recognized_gesture & E_GESTURE_TYPE_PAN) ||
@@ -856,6 +874,9 @@ _e_gesture_process_pinch_move(Ecore_Event_Mouse_Move *ev)
 static void
 _e_gesture_process_pinch_up(Ecore_Event_Mouse_Button *ev)
 {
+   E_Gesture_Event_Pinch *pinch = &gesture->gesture_events.pinchs;
+
+   if (!pinch->activation.active) return;
    _e_gesture_pinch_cancel();
 }
 
@@ -1052,6 +1073,8 @@ _e_gesture_process_tap_down(Ecore_Event_Mouse_Button *ev)
 {
    E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
 
+   if (!taps->activation.active) return;
+
    if (gesture->gesture_events.recognized_gesture)
      _e_gesture_tap_cancel();
 
@@ -1109,6 +1132,8 @@ _e_gesture_process_tap_move(Ecore_Event_Mouse_Move *ev)
    Rect current_rect = {0, };
    int xx1, yy1, xx2, yy2;
 
+   if (!taps->activation.active) return;
+
    if (gesture->gesture_events.recognized_gesture)
      _e_gesture_tap_cancel();
 
@@ -1133,6 +1158,8 @@ static void
 _e_gesture_process_tap_up(Ecore_Event_Mouse_Button *ev)
 {
    E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+
+   if (!taps->activation.active) return;
 
    if (gesture->gesture_events.recognized_gesture)
      _e_gesture_tap_cancel();
@@ -1441,7 +1468,8 @@ _e_gesture_process_palm(int val)
    if (val <= 0) return;
    if (!gesture->grabbed_gesture) return;
 
-   if (!(gesture->gesture_filter & E_GESTURE_TYPE_PALM_COVER))
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_PALM_COVER) &&
+       gesture->gesture_events.palm_covers.activation.active)
      {
         _e_gesture_process_palm_cover(val);
      }
@@ -1461,6 +1489,38 @@ _e_gesture_process_axis_update(void *event)
           }
      }
    return E_GESTURE_EVENT_STATE_PROPAGATE;
+}
+
+void
+e_gesture_event_deactivate_check(void)
+{
+   if (gesture->gesture_events.num_pressed <= 0) return;
+   if (gesture->gesture_filter == E_GESTURE_TYPE_ALL) return;
+
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_EDGE_SWIPE) &&
+       gesture->gesture_events.edge_swipes.activation.active)
+     {
+        _e_gesture_edge_swipe_cancel();
+     }
+
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_TAP) &&
+       gesture->gesture_events.taps.activation.active)
+     {
+        _e_gesture_tap_cancel();
+     }
+
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_PAN) &&
+       gesture->gesture_events.pans.activation.active)
+     {
+        _e_gesture_pan_cancel();
+     }
+
+   if (!(gesture->gesture_filter & E_GESTURE_TYPE_PINCH) &&
+       gesture->gesture_events.pinchs.activation.active)
+     {
+        _e_gesture_pinch_cancel();
+     }
+
 }
 
 /* Function for checking the existing grab for a key and sending key event(s) */

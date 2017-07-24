@@ -613,6 +613,220 @@ _e_gesture_deselect_palm_cover(struct wl_client *client, struct wl_resource *res
    return ret;
 }
 
+static Eina_Bool
+_e_gesture_deactivate_find_surface(Eina_List *list, struct wl_resource *surface)
+{
+   Eina_List *l;
+   E_Gesture_Activate_Surface_Info *idata;
+
+   EINA_LIST_FOREACH(list, l, idata)
+     {
+        if (surface == idata->surface)
+          {
+             return EINA_TRUE;
+          }
+     }
+   return EINA_FALSE;
+}
+
+static char *
+_e_gesture_util_type_to_string(unsigned int type)
+{
+   switch (type)
+     {
+        case E_GESTURE_TYPE_EDGE_SWIPE:
+          return "edge_swipe";
+        case E_GESTURE_TYPE_TAP:
+          return "tap";
+        case E_GESTURE_TYPE_PALM_COVER:
+          return "palm_cover";
+        case E_GESTURE_TYPE_PAN:
+          return "pan";
+        case E_GESTURE_TYPE_PINCH:
+          return "pinch";
+        default:
+          return "unknown";
+     }
+}
+
+static void
+_e_gesture_deactivate_list_unset(struct wl_client *client, struct wl_resource *surface, E_Gesture_Activate_Info *info, unsigned int type)
+{
+   Eina_List *l, *l_next;
+   struct wl_resource *surface_data;
+
+   if (surface)
+     {
+        EINA_LIST_FOREACH_SAFE(info->surfaces, l, l_next, surface_data)
+          {
+             if (surface_data == surface)
+               {
+                  info->surfaces = eina_list_remove_list(info->surfaces, l);
+                  break;
+               }
+          }
+     }
+   else if (info->client && (info->client == client))
+     {
+        info->client = NULL;
+        info->active = EINA_TRUE;
+     }
+   else
+     {
+        GTWRN("Failed to unset %s deactivate. surface: %p, client: %p (already deactivated client: %p)\n", _e_gesture_util_type_to_string(type), surface, client, info->client);
+     }
+}
+
+static void
+_e_gesture_deactivate_cb_client_listener(struct wl_listener *l, void *data)
+{
+   struct wl_client *client = data;
+
+   _e_gesture_deactivate_list_unset(client, NULL, &gesture->gesture_events.edge_swipes.activation, E_GESTURE_TYPE_EDGE_SWIPE);
+   _e_gesture_deactivate_list_unset(client, NULL, &gesture->gesture_events.taps.activation, E_GESTURE_TYPE_TAP);
+   _e_gesture_deactivate_list_unset(client, NULL, &gesture->gesture_events.palm_covers.activation, E_GESTURE_TYPE_PALM_COVER);
+   _e_gesture_deactivate_list_unset(client, NULL, &gesture->gesture_events.pans.activation, E_GESTURE_TYPE_PAN);
+   _e_gesture_deactivate_list_unset(client, NULL, &gesture->gesture_events.pinchs.activation, E_GESTURE_TYPE_PINCH);
+
+   wl_list_remove(&l->link);
+   E_FREE(l);
+}
+
+static void
+_e_gesture_deactivate_cb_surface_listener(struct wl_listener *l, void *data)
+{
+   struct wl_resource *surface = data;
+
+   _e_gesture_deactivate_list_unset(NULL, surface, &gesture->gesture_events.edge_swipes.activation, E_GESTURE_TYPE_EDGE_SWIPE);
+   _e_gesture_deactivate_list_unset(NULL, surface, &gesture->gesture_events.taps.activation, E_GESTURE_TYPE_TAP);
+   _e_gesture_deactivate_list_unset(NULL, surface, &gesture->gesture_events.palm_covers.activation, E_GESTURE_TYPE_PALM_COVER);
+   _e_gesture_deactivate_list_unset(NULL, surface, &gesture->gesture_events.pans.activation, E_GESTURE_TYPE_PAN);
+   _e_gesture_deactivate_list_unset(NULL, surface, &gesture->gesture_events.pinchs.activation, E_GESTURE_TYPE_PINCH);
+
+   wl_list_remove(&l->link);
+   E_FREE(l);
+}
+
+static int
+_e_gesture_deactivate_listener_add(struct wl_client *client, struct wl_resource * surface)
+{
+   struct wl_listener *destroy_listener = NULL;
+
+   EINA_SAFETY_ON_FALSE_RETURN_VAL(client || surface, TIZEN_GESTURE_ERROR_INVALID_DATA);
+
+   destroy_listener = E_NEW(struct wl_listener, 1);
+   if (!destroy_listener)
+     {
+        GTERR("Failed to allocate memory for deactivate destroy listener !\n");
+        return TIZEN_GESTURE_ERROR_NO_SYSTEM_RESOURCES;
+     }
+
+   if (surface)
+     {
+        destroy_listener->notify = _e_gesture_deactivate_cb_surface_listener;
+        wl_resource_add_destroy_listener(surface, destroy_listener);
+     }
+   else
+     {
+        destroy_listener->notify = _e_gesture_deactivate_cb_client_listener;
+        wl_client_add_destroy_listener(client, destroy_listener);
+     }
+
+   return TIZEN_GESTURE_ERROR_NONE;
+}
+
+static int
+_e_gesture_deactivate_list_set(struct wl_client *client, struct wl_resource *surface, E_Gesture_Activate_Info *info, unsigned int type)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   if (surface)
+     {
+        if (!_e_gesture_deactivate_find_surface(info->surfaces, surface))
+          {
+             info->surfaces = eina_list_append(info->surfaces, surface);
+             _e_gesture_deactivate_listener_add(client, surface);
+          }
+     }
+   else if (!info->client)
+     {
+        info->client = client;
+        info->active = EINA_FALSE;
+        _e_gesture_deactivate_listener_add(client, surface);
+     }
+   else
+     {
+        GTWRN("Failed to deactivate %s !(request surface: %p, client: %p), already deactivated client: %p\n",
+              _e_gesture_util_type_to_string(type), surface, client, info->client);
+        ret = TIZEN_GESTURE_ERROR_GRABBED_ALREADY;
+     }
+
+   return ret;
+}
+
+static int
+_e_gesture_deactivate_set(struct wl_client *client,
+                        struct wl_resource *resource,
+                        struct wl_resource *surface,
+                        uint32_t type)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   if (type & E_GESTURE_TYPE_EDGE_SWIPE)
+     {
+        ret = _e_gesture_deactivate_list_set(client, surface, &gesture->gesture_events.edge_swipes.activation, E_GESTURE_TYPE_EDGE_SWIPE);
+     }
+   if (type & E_GESTURE_TYPE_TAP)
+     {
+        ret = _e_gesture_deactivate_list_set(client, surface, &gesture->gesture_events.taps.activation, E_GESTURE_TYPE_TAP);
+     }
+   if (type & E_GESTURE_TYPE_PALM_COVER)
+     {
+        ret = _e_gesture_deactivate_list_set(client, surface, &gesture->gesture_events.palm_covers.activation, E_GESTURE_TYPE_PALM_COVER);
+     }
+   if (type & E_GESTURE_TYPE_PAN)
+     {
+        ret = _e_gesture_deactivate_list_set(client, surface, &gesture->gesture_events.pans.activation, E_GESTURE_TYPE_PAN);
+     }
+   if (type & E_GESTURE_TYPE_PINCH)
+     {
+        ret = _e_gesture_deactivate_list_set(client, surface, &gesture->gesture_events.pinchs.activation, E_GESTURE_TYPE_PINCH);
+     }
+
+   return ret;
+}
+
+static int
+_e_gesture_deactivate_unset(struct wl_client *client,
+                          struct wl_resource *resource,
+                          struct wl_resource *surface,
+                          uint32_t type)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   if (type & E_GESTURE_TYPE_EDGE_SWIPE)
+     {
+        _e_gesture_deactivate_list_unset(client, surface, &gesture->gesture_events.edge_swipes.activation, E_GESTURE_TYPE_EDGE_SWIPE);
+     }
+   if (type & E_GESTURE_TYPE_TAP)
+     {
+        _e_gesture_deactivate_list_unset(client, surface, &gesture->gesture_events.taps.activation, E_GESTURE_TYPE_TAP);
+     }
+   if (type & E_GESTURE_TYPE_PALM_COVER)
+     {
+        _e_gesture_deactivate_list_unset(client, surface, &gesture->gesture_events.palm_covers.activation, E_GESTURE_TYPE_PALM_COVER);
+     }
+   if (type & E_GESTURE_TYPE_PAN)
+     {
+        _e_gesture_deactivate_list_unset(client, surface, &gesture->gesture_events.pans.activation, E_GESTURE_TYPE_PAN);
+     }
+   if (type & E_GESTURE_TYPE_PINCH)
+     {
+        _e_gesture_deactivate_list_unset(client, surface, &gesture->gesture_events.pinchs.activation, E_GESTURE_TYPE_PINCH);
+     }
+
+   return ret;
+}
 
 static void
 _e_gesture_cb_grab_edge_swipe(struct wl_client *client,
@@ -971,7 +1185,10 @@ _e_gesture_cb_activate_set(struct wl_client *client,
 {
    int ret = TIZEN_GESTURE_ERROR_NONE;
 
-   ret = TIZEN_GESTURE_ERROR_NOT_SUPPORTED;
+   if (!active)
+     ret = _e_gesture_deactivate_set(client, resource, surface, type);
+   else
+     ret = _e_gesture_deactivate_unset(client, resource, surface, type);
 
    tizen_gesture_send_activate_notify(resource, surface, type, active, ret);
 }
@@ -1052,6 +1269,50 @@ _e_gesture_event_filter(void *data, void *loop_data EINA_UNUSED, int type, void 
 }
 
 static void
+_e_gesture_deactivate_surface_list_check(struct wl_resource *surface, E_Gesture_Activate_Info *info)
+{
+   Eina_Bool res;
+
+   res = _e_gesture_deactivate_find_surface(info->surfaces, surface);
+
+   if (res) info->active = EINA_FALSE;
+   else info->active = EINA_TRUE;
+}
+
+static void
+_e_gesture_deactivate_surface_check(E_Client *ec)
+{
+   struct wl_resource *surface;
+
+   EINA_SAFETY_ON_NULL_RETURN(ec);
+   EINA_SAFETY_ON_NULL_RETURN(ec->comp_data);
+
+   surface = ec->comp_data->wl_surface;
+   if (!surface) return;
+
+   if (!gesture->gesture_events.edge_swipes.activation.client)
+     {
+        _e_gesture_deactivate_surface_list_check(surface, &gesture->gesture_events.edge_swipes.activation);
+     }
+   if (!gesture->gesture_events.taps.activation.client)
+     {
+        _e_gesture_deactivate_surface_list_check(surface, &gesture->gesture_events.taps.activation);
+     }
+   if (!gesture->gesture_events.palm_covers.activation.client)
+     {
+        _e_gesture_deactivate_surface_list_check(surface, &gesture->gesture_events.palm_covers.activation);
+     }
+   if (!gesture->gesture_events.pans.activation.client)
+     {
+        _e_gesture_deactivate_surface_list_check(surface, &gesture->gesture_events.pans.activation);
+     }
+   if (!gesture->gesture_events.pinchs.activation.client)
+     {
+        _e_gesture_deactivate_surface_list_check(surface, &gesture->gesture_events.pinchs.activation);
+     }
+}
+
+static void
 _e_gesture_window_gesture_disabled_change(E_Client *ec)
 {
    if (ec->gesture_disable && gesture->enable)
@@ -1083,6 +1344,8 @@ _e_gesture_cb_client_focus_in(void *data, int type, void *event)
    EINA_SAFETY_ON_NULL_RETURN_VAL(ec->comp_data, ECORE_CALLBACK_PASS_ON);
 
    _e_gesture_window_gesture_disabled_change(ec);
+   _e_gesture_deactivate_surface_check(ec);
+   e_gesture_event_deactivate_check();
 
    return ECORE_CALLBACK_PASS_ON;
 }

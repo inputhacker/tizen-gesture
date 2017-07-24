@@ -15,12 +15,13 @@
 #define E_GESTURE_TYPE_EDGE_DRAG TIZEN_GESTURE_TYPE_EDGE_DRAG
 #define E_GESTURE_TYPE_TAP TIZEN_GESTURE_TYPE_TAP
 #define E_GESTURE_TYPE_PALM_COVER TIZEN_GESTURE_TYPE_PALM_COVER
-#define E_GESTURE_TYPE_PAN (TIZEN_GESTURE_TYPE_PALM_COVER << 1)
-#define E_GESTURE_TYPE_PINCH (TIZEN_GESTURE_TYPE_PALM_COVER << 2)
+#define E_GESTURE_TYPE_PAN TIZEN_GESTURE_TYPE_PAN
+#define E_GESTURE_TYPE_PINCH TIZEN_GESTURE_TYPE_PINCH
+#define E_GESTURE_TYPE_PALM_SWIPE TIZEN_GESTURE_TYPE_PALM_SWIPE
 
 #define E_GESTURE_FINGER_MAX 3
-#define E_GESTURE_TYPE_MAX (E_GESTURE_TYPE_PINCH + 1)
-#define E_GESTURE_TYPE_ALL (E_GESTURE_TYPE_EDGE_SWIPE | E_GESTURE_TYPE_EDGE_DRAG | E_GESTURE_TYPE_TAP | E_GESTURE_TYPE_PAN | E_GESTURE_TYPE_PINCH | E_GESTURE_TYPE_PALM_COVER)
+#define E_GESTURE_TYPE_MAX (E_GESTURE_TYPE_PALM_SWIPE + 1)
+#define E_GESTURE_TYPE_ALL (E_GESTURE_TYPE_EDGE_SWIPE | E_GESTURE_TYPE_EDGE_DRAG | E_GESTURE_TYPE_TAP | E_GESTURE_TYPE_PAN | E_GESTURE_TYPE_PINCH | E_GESTURE_TYPE_PALM_COVER | E_GESTURE_TYPE_PALM_SWIPE)
 #define E_GESTURE_KEYBOARD_NAME "Gesture Keyboard"
 #define E_GESTURE_AUX_HINT_GESTURE_DISABLE "wm.policy.win.gesture.disable"
 
@@ -78,6 +79,8 @@ typedef struct _E_Gesture_Finger E_Gesture_Finger;
 typedef struct _E_Gesture_Event_Info E_Gesture_Event_Info;
 typedef struct _E_Gesture_Event_Client E_Gesture_Event_Client;
 typedef struct _E_Gesture_Select_Surface E_Gesture_Select_Surface;
+typedef struct _E_Gesture_Activate_Surface_Info E_Gesture_Activate_Surface_Info;
+typedef struct _E_Gesture_Activate_Info E_Gesture_Activate_Info;
 
 typedef enum _E_Gesture_Edge E_Gesture_Edge;
 typedef enum _E_Gesture_Event_State E_Gesture_Event_State;
@@ -145,6 +148,19 @@ struct _E_Gesture_Event_Info
 {
    int type;
    void *event;
+};
+
+struct _E_Gesture_Activate_Surface_Info
+{
+   Eina_Bool active;
+   struct wl_resource *surface;
+};
+
+struct _E_Gesture_Activate_Info
+{
+   Eina_Bool active;
+   struct wl_client *client;
+   Eina_List *surfaces;
 };
 
 struct _E_Gesture_Conf_Edd
@@ -217,6 +233,7 @@ struct _E_Gesture_Event_Edge_Swipe_Finger
 
 struct _E_Gesture_Event_Edge_Swipe
 {
+   E_Gesture_Activate_Info activation;
    E_Gesture_Event_Edge_Swipe_Finger fingers[E_GESTURE_FINGER_MAX + 2];
 
    unsigned int edge;
@@ -246,6 +263,7 @@ struct _E_Gesture_Event_Tap_Finger
 
 struct _E_Gesture_Event_Tap
 {
+   E_Gesture_Activate_Info activation;
    E_Gesture_Event_Tap_Finger fingers[E_GESTURE_FINGER_MAX + 2];
    E_Gesture_Tap_State state;
    unsigned int enabled_finger;
@@ -264,6 +282,7 @@ struct _E_Gesture_Event_Tap
 
 struct _E_Gesture_Event_Pan
 {
+   E_Gesture_Activate_Info activation;
    E_Gesture_Event_Client fingers[E_GESTURE_FINGER_MAX + 2];
    E_Gesture_PanPinch_State state;
    Coords start_point;
@@ -277,6 +296,7 @@ struct _E_Gesture_Event_Pan
 
 struct _E_Gesture_Event_Pinch
 {
+   E_Gesture_Activate_Info activation;
    E_Gesture_Event_Client fingers[E_GESTURE_FINGER_MAX + 2];
    E_Gesture_PanPinch_State state;
    double distance;
@@ -288,6 +308,7 @@ struct _E_Gesture_Event_Pinch
 
 struct _E_Gesture_Event_Palm_Cover
 {
+   E_Gesture_Activate_Info activation;
    E_Gesture_Event_Client client_info;
    Eina_List *select_surface_list;
    unsigned int start_time;
@@ -359,6 +380,7 @@ E_API void *e_modapi_init(E_Module *m);
 E_API int   e_modapi_shutdown(E_Module *m);
 E_API int   e_modapi_save(E_Module *m);
 
+void e_gesture_event_deactivate_check(void);
 Eina_Bool e_gesture_process_events(void *event, int type);
 int e_gesture_type_convert(uint32_t type);
 
