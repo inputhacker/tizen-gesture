@@ -38,6 +38,10 @@
 #define E_GESTURE_EDGE_SWIPE_BACK_KEY 166
 #define E_GESTURE_EDGE_SWIPE_BACK_DEFAULT_ENABLE EINA_TRUE
 
+#define E_GESTURE_EDGE_DRAG_START_TIME 0.01
+#define E_GESTURE_EDGE_DRAG_START_AREA 50
+#define E_GESTURE_EDGE_DRAG_DIFF 10
+
 #define E_GESTURE_TAP_REPEATS_MAX 3
 #define E_GESTURE_TAP_START_TIME 0.05
 #define E_GESTURE_TAP_DONE_TIME 1.0
@@ -56,9 +60,11 @@
 typedef struct _E_Gesture E_Gesture;
 typedef struct _E_Gesture* E_GesturePtr;
 typedef struct _E_Gesture_Event E_Gesture_Event;
+typedef struct _E_Gesture_Event_Edge E_Gesture_Event_Edge;
 typedef struct _E_Gesture_Event_Edge_Swipe E_Gesture_Event_Edge_Swipe;
-typedef struct _E_Gesture_Event_Edge_Swipe_Finger E_Gesture_Event_Edge_Swipe_Finger;
-typedef struct _E_Gesture_Event_Edge_Swipe_Finger_Edge E_Gesture_Event_Edge_Swipe_Finger_Edge;
+typedef struct _E_Gesture_Event_Edge_Drag E_Gesture_Event_Edge_Drag;
+typedef struct _E_Gesture_Event_Edge_Finger E_Gesture_Event_Edge_Finger;
+typedef struct _E_Gesture_Event_Edge_Finger_Edge E_Gesture_Event_Edge_Finger_Edge;
 typedef struct _E_Gesture_Grabbed_Client E_Gesture_Grabbed_Client;
 typedef struct _E_Gesture_Conf_Edd E_Gesture_Conf_Edd;
 typedef struct _E_Gesture_Config_Data E_Gesture_Config_Data;
@@ -180,6 +186,12 @@ struct _E_Gesture_Conf_Edd
    } edge_swipe;
    struct
      {
+        double time_begin;
+        int area_offset;
+        int diff_length;
+     } edge_drag;
+   struct
+     {
         int repeats_max;
         double time_start;
         double time_done;
@@ -216,7 +228,7 @@ struct _E_Gesture_Select_Surface
    struct wl_resource *res;
 };
 
-struct _E_Gesture_Event_Edge_Swipe_Finger_Edge
+struct _E_Gesture_Event_Edge_Finger_Edge
 {
    struct wl_client *client;
    struct wl_resource *res;
@@ -224,28 +236,45 @@ struct _E_Gesture_Event_Edge_Swipe_Finger_Edge
    unsigned int ep;
 };
 
-struct _E_Gesture_Event_Edge_Swipe_Finger
+struct _E_Gesture_Event_Edge_Finger
 {
    Coords start;
    Eina_Bool enabled;
    Eina_List *edge[E_GESTURE_EDGE_MAX + 1];
 };
 
-struct _E_Gesture_Event_Edge_Swipe
+struct _E_Gesture_Event_Edge
 {
    E_Gesture_Activate_Info activation;
-   E_Gesture_Event_Edge_Swipe_Finger fingers[E_GESTURE_FINGER_MAX + 2];
+   E_Gesture_Event_Edge_Finger fingers[E_GESTURE_FINGER_MAX + 2];
 
    unsigned int edge;
+
+   unsigned int enabled_finger;
+   unsigned int enabled_edge;
+};
+
+struct _E_Gesture_Event_Edge_Swipe
+{
+   E_Gesture_Event_Edge base;
 
    unsigned int combined_keycode;
    unsigned int back_keycode;
 
-   unsigned int enabled_finger;
-   unsigned int enabled_edge;
-
    Ecore_Timer *start_timer;
    Ecore_Timer *done_timer;
+};
+
+struct _E_Gesture_Event_Edge_Drag
+{
+   E_Gesture_Event_Edge base;
+
+   Ecore_Timer *start_timer;
+
+   int idx;
+
+   Coords start_point;
+   Coords center_point;
 };
 
 struct _E_Gesture_Event_Tap_Finger_Repeats
@@ -320,7 +349,8 @@ struct _E_Gesture_Grabbed_Client
    struct wl_listener *destroy_listener;
    unsigned int grabbed_gesture;
 
-   E_Gesture_Event_Edge_Swipe_Finger edge_swipe_fingers[E_GESTURE_FINGER_MAX + 2];
+   E_Gesture_Event_Edge_Finger edge_swipe_fingers[E_GESTURE_FINGER_MAX + 2];
+   E_Gesture_Event_Edge_Finger edge_drag_fingers[E_GESTURE_FINGER_MAX + 2];
    E_Gesture_Event_Tap_Finger tap_fingers[E_GESTURE_FINGER_MAX + 2];
    E_Gesture_Event_Client pan_fingers[E_GESTURE_FINGER_MAX + 2];
    E_Gesture_Event_Client pinch_fingers[E_GESTURE_FINGER_MAX + 2];
@@ -330,6 +360,7 @@ struct _E_Gesture_Grabbed_Client
 struct _E_Gesture_Event
 {
    E_Gesture_Event_Edge_Swipe edge_swipes;
+   E_Gesture_Event_Edge_Drag edge_drags;
    E_Gesture_Event_Tap taps;
    E_Gesture_Event_Pan pans;
    E_Gesture_Event_Pinch pinchs;

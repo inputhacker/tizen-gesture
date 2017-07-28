@@ -19,6 +19,10 @@ _e_gesture_conf_value_check(E_Gesture_Config_Data* gconfig)
    if (conf->edge_swipe.compose_key <= 0) conf->edge_swipe.compose_key = E_GESTURE_EDGE_SWIPE_COMBINE_KEY;
    if (conf->edge_swipe.back_key <= 0) conf->edge_swipe.back_key = E_GESTURE_EDGE_SWIPE_BACK_KEY;
 
+   if (conf->edge_drag.time_begin <= 0.0) conf->edge_drag.time_begin = E_GESTURE_EDGE_DRAG_START_TIME;
+   if (conf->edge_drag.area_offset <= 0) conf->edge_drag.area_offset = E_GESTURE_EDGE_DRAG_START_AREA;
+   if (conf->edge_drag.diff_length <= 0) conf->edge_drag.diff_length = E_GESTURE_EDGE_DRAG_DIFF;
+
    if (conf->tap.repeats_max <= 0) conf->tap.repeats_max = E_GESTURE_TAP_REPEATS_MAX;
    if (conf->tap.time_start <= 0.0) conf->tap.time_start = E_GESTURE_TAP_START_TIME;
    if (conf->tap.time_done <= 0.0) conf->tap.time_done = E_GESTURE_TAP_DONE_TIME;
@@ -50,6 +54,10 @@ e_gesture_conf_init(E_Gesture_Config_Data *gconfig)
    E_CONFIG_VAL(D, T, edge_swipe.compose_key, INT);
    E_CONFIG_VAL(D, T, edge_swipe.back_key, INT);
    E_CONFIG_VAL(D, T, edge_swipe.default_enable_back, CHAR);
+
+   E_CONFIG_VAL(D, T, edge_drag.time_begin, DOUBLE);
+   E_CONFIG_VAL(D, T, edge_drag.area_offset, INT);
+   E_CONFIG_VAL(D, T, edge_drag.diff_length, INT);
 
    E_CONFIG_VAL(D, T, tap.repeats_max, INT);
    E_CONFIG_VAL(D, T, tap.time_start, DOUBLE);
