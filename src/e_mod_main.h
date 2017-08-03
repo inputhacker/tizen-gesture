@@ -171,41 +171,42 @@ struct _E_Gesture_Activate_Info
 
 struct _E_Gesture_Conf_Edd
 {
-   char *key_device_name;
-   Eina_Bool event_keep;
+   char *key_device_name;              // The name of keyboard device to generate key events
+   Eina_Bool event_keep;               // 1: Do not propagate events to client immediatly until recognizing gestures
+                                       // 0: Propagate events immediatly but send a cancel event after recognizing gestures (default)
    struct
    {
-      double time_done;
-      double time_begin;
-      int area_offset;
-      int min_length;
-      int max_length;
-      int compose_key;
-      int back_key;
-      Eina_Bool default_enable_back;
+      double time_done;                // The duration to recognize a edge swipe
+      double time_begin;               // The minimun of time to distinguish if it is a gesture or normal touch
+      int area_offset;                 // Edge region to start to calculate
+      int min_length;                  // Limit size to move cross direction
+      int max_length;                  // Moving length to recognize edge swipe
+      int compose_key;                 // Keycode of composed with gesture
+      int back_key;                    // Keycode of back key
+      Eina_Bool default_enable_back;   // Convert a top edge swipe to back key
    } edge_swipe;
    struct
      {
-        double time_begin;
-        int area_offset;
-        int diff_length;
+        double time_begin;             // The minimun of time to distinguish if it is a gesture or normal touch
+        int area_offset;               // Edge region to start to calculate
+        int diff_length;               // Moved length to generate edge drag events
      } edge_drag;
    struct
      {
-        int repeats_max;
-        double time_start;
-        double time_done;
-        double time_interval;
-        int moving_range;
+        int repeats_max;               // Maximum number of repeats
+        double time_start;             // Minimun of time to distinguish if it is a gesture or normal touch
+        double time_done;              // Duration to release all fingers
+        double time_interval;          // Interval duration between taps
+        int moving_range;              // Limit region duriong taps
      } tap;
    struct
      {
-        double time_start;
-        int moving_range;
+        double time_start;             // The minimun of time to distinguish if it is a gesture or normal touch
+        int moving_range;              // Moved length to generate pan events
      } pan;
    struct
      {
-        double moving_distance_range;
+        double moving_distance_range;  // Moved length to generate pinch events
      } pinch;
 };
 
