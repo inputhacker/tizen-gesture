@@ -1377,6 +1377,12 @@ _e_gesture_cb_activate_set(struct wl_client *client,
    tizen_gesture_send_activate_notify(resource, surface, type, active, ret);
 }
 
+static void
+_e_gesture_cb_destroy(struct wl_client *client, struct wl_resource *resource)
+{
+   wl_resource_destroy(resource);
+}
+
 static const struct tizen_gesture_interface _e_gesture_implementation = {
    _e_gesture_cb_grab_edge_swipe,
    _e_gesture_cb_ungrab_edge_swipe,
@@ -1389,14 +1395,8 @@ static const struct tizen_gesture_interface _e_gesture_implementation = {
    _e_gesture_cb_select_palm_cover,
    _e_gesture_cb_deselect_palm_cover,
    _e_gesture_cb_activate_set,
+   _e_gesture_cb_destroy,
 };
-
-/* tizen_gesture global object destroy function */
-static void
-_e_gesture_cb_destory(struct wl_resource *resource)
-{
-   /* TODO : destroy resources if exist */
-}
 
 /* tizen_gesture global object bind function */
 static void
@@ -1405,7 +1405,7 @@ _e_gesture_cb_bind(struct wl_client *client, void *data, uint32_t version, uint3
    E_GesturePtr gesture_instance = data;
    struct wl_resource *resource;
 
-   resource = wl_resource_create(client, &tizen_gesture_interface, MAX(version, 1), id);
+   resource = wl_resource_create(client, &tizen_gesture_interface, MIN(version, 3), id);
 
    GTDBG("wl_resource_create(...,tizen_gesture_interface,...)\n");
 
@@ -1416,7 +1416,7 @@ _e_gesture_cb_bind(struct wl_client *client, void *data, uint32_t version, uint3
 	 return;
      }
 
-   wl_resource_set_implementation(resource, &_e_gesture_implementation, gesture_instance, _e_gesture_cb_destory);
+   wl_resource_set_implementation(resource, &_e_gesture_implementation, gesture_instance, _e_gesture_cb_destroy);
 }
 
 static Eina_Bool
@@ -1635,7 +1635,7 @@ _e_gesture_init(E_Module *m)
    GTDBG("pan time_start: %lf, moving_range: %d\n", gconfig->conf->pan.time_start, gconfig->conf->pan.moving_range);
    GTDBG("pinch moving_distance_range: %lf\n", gconfig->conf->pinch.moving_distance_range);
 
-   gesture->global = wl_global_create(e_comp_wl->wl.disp, &tizen_gesture_interface, 2, gesture, _e_gesture_cb_bind);
+   gesture->global = wl_global_create(e_comp_wl->wl.disp, &tizen_gesture_interface, 3, gesture, _e_gesture_cb_bind);
    if (!gesture->global)
      {
         GTERR("Failed to create global !\n");
