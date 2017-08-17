@@ -1416,7 +1416,7 @@ _e_gesture_cb_bind(struct wl_client *client, void *data, uint32_t version, uint3
 	 return;
      }
 
-   wl_resource_set_implementation(resource, &_e_gesture_implementation, gesture_instance, _e_gesture_cb_destroy);
+   wl_resource_set_implementation(resource, &_e_gesture_implementation, NULL, NULL);
 }
 
 static Eina_Bool
