@@ -291,16 +291,80 @@ notify:
    return;
 }
 
+static void
+_e_gesture_cb_grab_tap(struct wl_client *client,
+                       struct wl_resource *resource,
+                       uint32_t fingers,
+                       uint32_t repeats)
+{
+   ;// nothing to do. next feature can support this request.
+}
+
+static void
+_e_gesture_cb_ungrab_tap(struct wl_client *client,
+                         struct wl_resource *resource,
+                         uint32_t fingers,
+                         uint32_t repeats)
+{
+   ;// nothing to do. next feature can support this request.
+}
+
+static void
+_e_gesture_cb_grab_pan(struct wl_client *client,
+                       struct wl_resource *resource,
+                       uint32_t fingers)
+{
+   ;// nothing to do. next feature can support this request.
+}
+
+static void
+_e_gesture_cb_ungrab_pan(struct wl_client *client,
+                         struct wl_resource *resource,
+                         uint32_t fingers)
+{
+   ;// nothing to do. next feature can support this request.
+}
+
+static void
+_e_gesture_cb_grab_pinch(struct wl_client *client,
+                         struct wl_resource *resource,
+                         uint32_t fingers)
+{
+   ;// nothing to do. next feature can support this request.
+}
+
+static void
+_e_gesture_cb_ungrab_pinch(struct wl_client *client,
+                         struct wl_resource *resource,
+                         uint32_t fingers)
+{
+   ;// nothing to do. next feature can support this request.
+}
+
+static void
+_e_gesture_cb_destroy(struct wl_client *client,
+                      struct wl_resource *resource)
+{
+   wl_resource_destroy(resource);
+}
+
 static const struct tizen_gesture_interface _e_gesture_implementation = {
    _e_gesture_cb_grab_edge_swipe,
-   _e_gesture_cb_ungrab_edge_swipe
+   _e_gesture_cb_ungrab_edge_swipe,
+   _e_gesture_cb_grab_tap,
+   _e_gesture_cb_ungrab_tap,
+   _e_gesture_cb_grab_pan,
+   _e_gesture_cb_ungrab_pan,
+   _e_gesture_cb_grab_pinch,
+   _e_gesture_cb_ungrab_pinch,
+   _e_gesture_cb_destroy,
 };
 
 /* tizen_gesture global object destroy function */
 static void
-_e_gesture_cb_destory(struct wl_resource *resource)
+_e_gesture_cb_unbind(struct wl_resource *resource)
 {
-   /* TODO : destroy resources if exist */
+   /* TODO : unbind resources if exist */
 }
 
 /* tizen_keyrouter global object bind function */
@@ -310,7 +374,7 @@ _e_gesture_cb_bind(struct wl_client *client, void *data, uint32_t version, uint3
    E_GesturePtr gesture_instance = data;
    struct wl_resource *resource;
 
-   resource = wl_resource_create(client, &tizen_gesture_interface, MIN(version, 1), id);
+   resource = wl_resource_create(client, &tizen_gesture_interface, MIN(version, 3), id);
 
    GTDBG("wl_resource_create(...,tizen_gesture_interface,...)\n");
 
@@ -321,7 +385,7 @@ _e_gesture_cb_bind(struct wl_client *client, void *data, uint32_t version, uint3
 	 return;
      }
 
-   wl_resource_set_implementation(resource, &_e_gesture_implementation, gesture_instance, _e_gesture_cb_destory);
+   wl_resource_set_implementation(resource, &_e_gesture_implementation, gesture_instance, _e_gesture_cb_unbind);
 }
 
 static Eina_Bool
@@ -480,7 +544,7 @@ _e_gesture_init(E_Module *m)
    GTDBG("area_offset: %d, min_length: %d, max_length: %d\n", gconfig->conf->edge_swipe.area_offset, gconfig->conf->edge_swipe.min_length, gconfig->conf->edge_swipe.max_length);
    GTDBG("compose key: %d, back: %d, default: %d\n", gconfig->conf->edge_swipe.compose_key, gconfig->conf->edge_swipe.back_key, gconfig->conf->edge_swipe.default_enable_back);
 
-   gesture->global = wl_global_create(e_comp_wl->wl.disp, &tizen_gesture_interface, 1, gesture, _e_gesture_cb_bind);
+   gesture->global = wl_global_create(e_comp_wl->wl.disp, &tizen_gesture_interface, 3, gesture, _e_gesture_cb_bind);
    if (!gesture->global)
      {
         GTERR("Failed to create global !\n");
