@@ -1405,7 +1405,7 @@ _e_gesture_cb_bind(struct wl_client *client, void *data, uint32_t version, uint3
    E_GesturePtr gesture_instance = data;
    struct wl_resource *resource;
 
-   resource = wl_resource_create(client, &tizen_gesture_interface, MIN(version, 2), id);
+   resource = wl_resource_create(client, &tizen_gesture_interface, MIN(version, 3), id);
 
    GTDBG("wl_resource_create(...,tizen_gesture_interface,...)\n");
 
@@ -1635,7 +1635,7 @@ _e_gesture_init(E_Module *m)
    GTDBG("pan time_start: %lf, moving_range: %d\n", gconfig->conf->pan.time_start, gconfig->conf->pan.moving_range);
    GTDBG("pinch moving_distance_range: %lf\n", gconfig->conf->pinch.moving_distance_range);
 
-   gesture->global = wl_global_create(e_comp_wl->wl.disp, &tizen_gesture_interface, 2, gesture, _e_gesture_cb_bind);
+   gesture->global = wl_global_create(e_comp_wl->wl.disp, &tizen_gesture_interface, 3, gesture, _e_gesture_cb_bind);
    if (!gesture->global)
      {
         GTERR("Failed to create global !\n");
