@@ -1402,7 +1402,6 @@ static const struct tizen_gesture_interface _e_gesture_implementation = {
 static void
 _e_gesture_cb_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
 {
-   E_GesturePtr gesture_instance = data;
    struct wl_resource *resource;
 
    resource = wl_resource_create(client, &tizen_gesture_interface, MIN(version, 3), id);
