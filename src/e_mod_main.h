@@ -11,6 +11,8 @@
 #define GTINF(msg, ARG...) INF("[tizen_gesture][%s:%d] "msg, __FUNCTION__, __LINE__, ##ARG)
 #define GTDBG(msg, ARG...) DBG("[tizen_gesture][%s:%d] "msg, __FUNCTION__, __LINE__, ##ARG)
 
+#define E_GESTURE_SERVER_CLIENT (void *)0x1
+
 #define E_GESTURE_TYPE_EDGE_SWIPE TIZEN_GESTURE_TYPE_EDGE_SWIPE
 #define E_GESTURE_TYPE_EDGE_DRAG TIZEN_GESTURE_TYPE_EDGE_DRAG
 #define E_GESTURE_TYPE_TAP TIZEN_GESTURE_TYPE_TAP
@@ -54,7 +56,6 @@
 #define E_GESTURE_PINCH_MOVING_DISTANCE_RANGE 15.0
 
 #define ABS(x) (((x)>0)?(x):-(x))
-
 #define RAD2DEG(x) ((x) * 57.295779513)
 
 typedef struct _E_Gesture E_Gesture;
@@ -97,14 +98,6 @@ extern E_GesturePtr gesture;
 
 #define E_GESTURE_EDGE_MAX 4
 
-enum _E_Gesture_Edge
-{
-   E_GESTURE_EDGE_NONE,
-   E_GESTURE_EDGE_TOP,
-   E_GESTURE_EDGE_RIGHT,
-   E_GESTURE_EDGE_BOTTOM,
-   E_GESTURE_EDGE_LEFT,
-};
 #define E_GESTURE_EDGE_ALL ((1 << E_GESTURE_EDGE_TOP) | (1 << E_GESTURE_EDGE_RIGHT) | (1 << E_GESTURE_EDGE_BOTTOM) | (1 << E_GESTURE_EDGE_LEFT))
 
 enum _E_Gesture_Event_State

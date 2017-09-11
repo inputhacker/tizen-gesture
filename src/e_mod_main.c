@@ -73,6 +73,26 @@ _e_gesture_set_client_to_list(E_Gesture_Grabbed_Client *gclient, struct wl_clien
    gclient->grabbed_gesture |= mode;
 }
 
+static char *
+_e_gesture_util_type_to_string(unsigned int type)
+{
+   switch (type)
+     {
+        case E_GESTURE_TYPE_EDGE_SWIPE:
+          return "edge_swipe";
+        case E_GESTURE_TYPE_TAP:
+          return "tap";
+        case E_GESTURE_TYPE_PALM_COVER:
+          return "palm_cover";
+        case E_GESTURE_TYPE_PAN:
+          return "pan";
+        case E_GESTURE_TYPE_PINCH:
+          return "pinch";
+        default:
+          return "unknown";
+     }
+}
+
 /* Function for registering wl_client destroy listener */
 int
 e_gesture_add_client_destroy_listener(struct wl_client *client, int mode, int fingers, unsigned int edge, unsigned int repeat, int sp, int ep)
@@ -80,6 +100,8 @@ e_gesture_add_client_destroy_listener(struct wl_client *client, int mode, int fi
    struct wl_listener *destroy_listener = NULL;
    Eina_List *l;
    E_Gesture_Grabbed_Client *grabbed_client, *data;
+
+   if (client == E_GESTURE_SERVER_CLIENT) return TIZEN_GESTURE_ERROR_NONE;
 
    EINA_LIST_FOREACH(gesture->grab_client_list, l, data)
      {
@@ -229,6 +251,40 @@ _e_gesture_pinch_current_list_check(void)
      }
 }
 
+static int
+_e_gesture_add_surface_destroy_listener(struct wl_resource *surface, int type)
+{
+   struct wl_listener *destroy_listener = NULL;
+   Eina_List *l;
+   struct wl_resource *surface_data;
+
+   EINA_SAFETY_ON_NULL_RETURN_VAL(surface, TIZEN_GESTURE_ERROR_INVALID_DATA);
+   if (type != E_GESTURE_TYPE_PALM_COVER)
+     return TIZEN_GESTURE_ERROR_INVALID_DATA;
+
+   EINA_LIST_FOREACH(gesture->select_surface_list, l, surface_data)
+     {
+        if (surface_data == surface)
+          {
+             return TIZEN_GESTURE_ERROR_NONE;
+          }
+     }
+
+   destroy_listener = E_NEW(struct wl_listener, 1);
+   if (!destroy_listener)
+     {
+        GTERR("Failed to allocate memory for wl_client destroy listener !\n");
+        return TIZEN_GESTURE_ERROR_NO_SYSTEM_RESOURCES;
+     }
+
+   destroy_listener->notify = _e_gesture_wl_surface_cb_destroy;
+   wl_resource_add_destroy_listener(surface, destroy_listener);
+
+   gesture->select_surface_list = eina_list_append(gesture->select_surface_list, surface);
+
+   return TIZEN_GESTURE_ERROR_NONE;
+}
+
 static void
 _e_gesture_remove_client_destroy_listener(struct wl_client *client, unsigned int mode, unsigned int fingers, unsigned int edge, unsigned int repeat, int sp, int ep)
 {
@@ -321,7 +377,470 @@ _e_gesture_remove_client_destroy_listener(struct wl_client *client, unsigned int
      }
 }
 
-#if 0
+static void
+_e_gesture_remove_surface_destroy_listener(struct wl_resource *surface, int type)
+{
+   Eina_List *l, *l_next;
+   struct wl_resource *surface_data;
+   struct wl_listener *destroy_listener;
+
+   EINA_SAFETY_ON_NULL_RETURN(surface);
+   if (type != E_GESTURE_TYPE_PALM_COVER) return;
+
+   destroy_listener = wl_resource_get_destroy_listener(surface, _e_gesture_wl_surface_cb_destroy);
+   if (!destroy_listener)
+     {
+        GTWRN("surface(%p) is not gesture selected surface\n", surface);
+     }
+
+   EINA_LIST_FOREACH_SAFE(gesture->select_surface_list, l, l_next, surface_data)
+     {
+        if (surface_data == surface)
+          {
+             gesture->select_surface_list = eina_list_remove_list(gesture->select_surface_list, l);
+             break;
+          }
+     }
+
+   wl_list_remove(&destroy_listener->link);
+   E_FREE(destroy_listener);
+}
+
+static Eina_Bool
+_e_gesture_edge_grabbed_client_check(struct wl_client *client)
+{
+   Eina_List *l;
+   E_Gesture_Event *gev;
+   int i, j;
+   E_Gesture_Event_Edge_Finger_Edge *edata;
+
+   gev = &gesture->gesture_events;
+
+   for (i = 1; i < E_GESTURE_FINGER_MAX + 1; i++)
+     {
+        for (j = 1; j < E_GESTURE_EDGE_MAX + 1; j++)
+          {
+             EINA_LIST_FOREACH(gev->edge_swipes.base.fingers[i].edge[j], l, edata)
+               {
+                  if (edata->client == client) return EINA_TRUE;
+               }
+          }
+     }
+   return EINA_FALSE;
+}
+
+static int
+_e_gesture_grab_edge_swipe(struct wl_client *client,
+                           struct wl_resource *resource,
+                           uint32_t fingers, uint32_t edge, uint32_t edge_size,
+                           uint32_t start_point, uint32_t end_point)
+{
+   E_Gesture_Event *gev;
+   int sp = 0, ep = 0;
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+   E_Gesture_Conf_Edd *conf = gesture->config->conf;
+
+   GTINF("client %p is request grab gesture, fingers: %d, edge: 0x%x, edge_size: %d, point( %d - %d)\n", client, fingers, edge, edge_size, start_point, end_point);
+   if (fingers > E_GESTURE_FINGER_MAX)
+     {
+        GTWRN("Do not support %d fingers (max: %d)\n", fingers, E_GESTURE_FINGER_MAX);
+        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
+        return ret;
+     }
+
+   gev = &gesture->gesture_events;
+
+   if (edge < TIZEN_GESTURE_EDGE_TOP || edge > TIZEN_GESTURE_EDGE_LEFT)
+     {
+        GTWRN("Invalid edge(%d)\n", edge);
+        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
+        return ret;
+     }
+
+   if (edge_size == TIZEN_GESTURE_EDGE_SIZE_PARTIAL)
+     {
+        sp = start_point;
+        ep = end_point;
+        if (((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM)) &&
+            (ep > e_comp->w))
+          ep = e_comp->w;
+        else if (((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT)) &&
+                 (ep > e_comp->h))
+          ep = e_comp->h;
+     }
+   else if (edge_size == TIZEN_GESTURE_EDGE_SIZE_FULL)
+     {
+        sp = 0;
+        if ((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM))
+          ep = e_comp->w;
+        else if ((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT))
+          ep = e_comp->h;
+     }
+   else
+     {
+        GTWRN("Invalid edge_size(%d)\n", edge_size);
+        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
+        return ret;
+     }
+
+   if ((conf->edge_swipe.default_enable_back) &&
+       (edge == E_GESTURE_EDGE_TOP))
+     {
+        ret = TIZEN_GESTURE_ERROR_GRABBED_ALREADY;
+     }
+   else if (_e_gesture_edge_boundary_check(&gev->edge_swipes.base.fingers[fingers], edge, sp, ep))
+     {
+        _e_gesture_edge_grab_add(&gev->edge_swipes.base.fingers[fingers], client, resource, edge, sp, ep);
+
+        e_gesture_add_client_destroy_listener(client, E_GESTURE_TYPE_EDGE_SWIPE, fingers, edge, 0, sp, ep);
+
+        gesture->grabbed_gesture |= E_GESTURE_TYPE_EDGE_SWIPE;
+        gev->edge_swipes.base.fingers[fingers].enabled = EINA_TRUE;
+        if (gev->event_keep) gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
+        gev->edge_swipes.base.enabled_edge |= (1 << edge);
+
+        ret = TIZEN_GESTURE_ERROR_NONE;
+     }
+   else
+     {
+        ret = TIZEN_GESTURE_ERROR_GRABBED_ALREADY;
+     }
+
+   return ret;
+}
+
+static int
+_e_gesture_ungrab_edge_swipe(struct wl_client *client,
+                             struct wl_resource *resource,
+                             uint32_t fingers, uint32_t edge, uint32_t edge_size,
+                             uint32_t start_point, uint32_t end_point)
+{
+   E_Gesture_Event *gev;
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+   int i;
+   Eina_List *l, *l_next;
+   E_Gesture_Event_Edge_Finger_Edge *edata;
+   Eina_Bool flag_removed = EINA_FALSE;
+   int sp = 0, ep = 0;
+
+   GTINF("client %p is request ungrab edge swipe gesture, fingers: %d, edge: 0x%x, edge_size: %d, (%d ~ %d)\n", client, fingers, edge, edge_size, start_point, end_point);
+
+   if (fingers > E_GESTURE_FINGER_MAX)
+     {
+        GTWRN("Do not support %d fingers (max: %d)\n", fingers, E_GESTURE_FINGER_MAX);
+        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
+        return ret;
+     }
+
+   gev = &gesture->gesture_events;
+
+   if (edge_size == TIZEN_GESTURE_EDGE_SIZE_PARTIAL)
+     {
+        sp = start_point;
+        ep = end_point;
+        if (((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM)) &&
+            (ep > e_comp->w))
+          ep = e_comp->w;
+        else if (((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT)) &&
+                 (ep > e_comp->h))
+          ep = e_comp->h;
+     }
+   else if (edge_size == TIZEN_GESTURE_EDGE_SIZE_FULL)
+     {
+        sp = 0;
+        if ((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM))
+          ep = e_comp->w;
+        else if ((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT))
+          ep = e_comp->h;
+     }
+   else
+     {
+        GTWRN("Invalid edge_size(%d)\n", edge_size);
+        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
+        return ret;
+     }
+
+   EINA_LIST_FOREACH_SAFE(gev->edge_swipes.base.fingers[fingers].edge[edge], l, l_next, edata)
+     {
+        if ((edata->client == client) && (edata->sp == sp) && (edata->ep == ep))
+          {
+             gev->edge_swipes.base.fingers[fingers].edge[edge] = eina_list_remove_list(
+                gev->edge_swipes.base.fingers[fingers].edge[edge], l);
+             E_FREE(edata);
+             flag_removed = EINA_TRUE;
+          }
+     }
+
+   if (flag_removed)
+     {
+        if (!_e_gesture_edge_grabbed_client_check(client))
+          {
+             _e_gesture_remove_client_destroy_listener(client, E_GESTURE_TYPE_EDGE_SWIPE, fingers, edge, 0, sp, ep);
+             _e_gesture_edge_swipe_current_list_check();
+          }
+     }
+
+   gev->edge_swipes.base.enabled_edge &= ~( 1 << edge);
+   for (i = 0; i < E_GESTURE_FINGER_MAX+1; i++)
+     {
+        if (eina_list_count(gev->edge_swipes.base.fingers[i].edge[edge]) > 0)
+          {
+             gev->edge_swipes.base.enabled_edge |= (1 << edge);
+             break;
+          }
+     }
+
+   return ret;
+}
+
+static int
+_e_gesture_grab_edge_drag(struct wl_client *client,
+                          struct wl_resource *resource,
+                          uint32_t fingers, uint32_t edge, uint32_t edge_size,
+                          uint32_t start_point, uint32_t end_point)
+{
+   E_Gesture_Event *gev;
+   int sp = 0, ep = 0;
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   GTINF("client %p is request edge_drag grab, fingers: %d, edge: 0x%x, edge_size: %d, point( %d - %d)\n", client, fingers, edge, edge_size, start_point, end_point);
+   if (fingers > E_GESTURE_FINGER_MAX)
+     {
+        GTWRN("Do not support %d fingers (max: %d)\n", fingers, E_GESTURE_FINGER_MAX);
+        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
+        goto out;
+     }
+
+   if (edge < TIZEN_GESTURE_EDGE_TOP || edge > TIZEN_GESTURE_EDGE_LEFT)
+     {
+        GTWRN("Invalid edge(%d)\n", edge);
+        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
+        goto out;
+     }
+
+   if (edge_size == TIZEN_GESTURE_EDGE_SIZE_PARTIAL)
+     {
+        sp = start_point;
+        ep = end_point;
+        if (((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM)) &&
+            (ep > e_comp->w))
+          ep = e_comp->w;
+        else if (((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT)) &&
+                 (ep > e_comp->h))
+          ep = e_comp->h;
+     }
+   else if (edge_size == TIZEN_GESTURE_EDGE_SIZE_FULL)
+     {
+        sp = 0;
+        if ((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM))
+          ep = e_comp->w;
+        else if ((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT))
+          ep = e_comp->h;
+     }
+   else
+     {
+        GTWRN("Invalid edge_size(%d)\n", edge_size);
+        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
+        goto out;
+     }
+
+   gev = &gesture->gesture_events;
+
+   if (_e_gesture_edge_boundary_check(&gev->edge_drags.base.fingers[fingers], edge, sp, ep))
+     {
+        _e_gesture_edge_grab_add(&gev->edge_drags.base.fingers[fingers], client, resource, edge, sp, ep);
+
+        e_gesture_add_client_destroy_listener(client, E_GESTURE_TYPE_EDGE_DRAG, fingers, edge, 0, sp, ep);
+
+        gesture->grabbed_gesture |= E_GESTURE_TYPE_EDGE_DRAG;
+        gev->edge_drags.base.fingers[fingers].enabled = EINA_TRUE;
+        if (gev->event_keep) gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
+        gev->edge_drags.base.enabled_edge |= (1 << edge);
+
+        ret = TIZEN_GESTURE_ERROR_NONE;
+     }
+   else
+     {
+        ret = TIZEN_GESTURE_ERROR_GRABBED_ALREADY;
+     }
+
+out:
+   return ret;
+}
+
+static int
+_e_gesture_ungrab_edge_drag(struct wl_client *client,
+                       struct wl_resource *resource,
+                       uint32_t fingers, uint32_t edge, uint32_t edge_size,
+                       uint32_t start_point, uint32_t end_point)
+{
+   E_Gesture_Event *gev;
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+   int i;
+   Eina_List *l, *l_next;
+   E_Gesture_Event_Edge_Finger_Edge *edata;
+   Eina_Bool flag_removed = EINA_FALSE;
+   int sp = 0, ep = 0;
+
+   GTINF("client %p is request ungrab edge drag gesture, fingers: %d, edge: 0x%x, edge_size: %d, (%d ~ %d)\n", client, fingers, edge, edge_size, start_point, end_point);
+
+   if (fingers > E_GESTURE_FINGER_MAX)
+     {
+        GTWRN("Do not support %d fingers (max: %d)\n", fingers, E_GESTURE_FINGER_MAX);
+        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
+        goto out;
+     }
+
+   if (edge_size == TIZEN_GESTURE_EDGE_SIZE_PARTIAL)
+     {
+        sp = start_point;
+        ep = end_point;
+        if (((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM)) &&
+            (ep > e_comp->w))
+          ep = e_comp->w;
+        else if (((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT)) &&
+                 (ep > e_comp->h))
+          ep = e_comp->h;
+     }
+   else if (edge_size == TIZEN_GESTURE_EDGE_SIZE_FULL)
+     {
+        sp = 0;
+        if ((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM))
+          ep = e_comp->w;
+        else if ((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT))
+          ep = e_comp->h;
+     }
+   else
+     {
+        GTWRN("Invalid edge_size(%d)\n", edge_size);
+        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
+        goto out;
+     }
+
+   gev = &gesture->gesture_events;
+
+   EINA_LIST_FOREACH_SAFE(gev->edge_drags.base.fingers[fingers].edge[edge], l, l_next, edata)
+     {
+        if ((edata->client == client) && (edata->sp == sp) && (edata->ep == ep))
+          {
+             gev->edge_drags.base.fingers[fingers].edge[edge] = eina_list_remove_list(
+                gev->edge_drags.base.fingers[fingers].edge[edge], l);
+             E_FREE(edata);
+             flag_removed = EINA_TRUE;
+          }
+     }
+
+   if (flag_removed)
+     {
+        if (!_e_gesture_edge_grabbed_client_check(client))
+          {
+             _e_gesture_remove_client_destroy_listener(client, E_GESTURE_TYPE_EDGE_DRAG, fingers, edge, 0, sp, ep);
+             _e_gesture_edge_drag_current_list_check();
+          }
+     }
+
+   gev->edge_drags.base.enabled_edge &= ~( 1 << edge);
+   for (i = 0; i < E_GESTURE_FINGER_MAX+1; i++)
+     {
+        if (eina_list_count(gev->edge_drags.base.fingers[i].edge[edge]) > 0)
+          {
+             gev->edge_drags.base.enabled_edge |= (1 << edge);
+             break;
+          }
+     }
+
+out:
+   return ret;
+}
+
+static int
+_e_gesture_grab_tap(struct wl_client *client,
+                    struct wl_resource *resource,
+                    uint32_t fingers, uint32_t repeats)
+{
+   E_Gesture_Event *gev;
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   GTINF("client %p requested to grab tap gesture (fingers: %d, repeats: %d)\n", client, fingers, repeats);
+
+   if (fingers > E_GESTURE_FINGER_MAX || repeats > E_GESTURE_TAP_REPEATS_MAX)
+     {
+        GTWRN("Not supported fingers /repeats bigger than their maximum values\n");
+        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
+        return ret;
+     }
+
+   gev = &gesture->gesture_events;
+
+   if (gev->taps.fingers[fingers].repeats[repeats].client)
+     {
+        GTWRN("%d finger %d repeats is already grabbed by %p client\n", fingers, repeats, gev->taps.fingers[fingers].repeats[repeats].client);
+        ret = TIZEN_GESTURE_ERROR_GRABBED_ALREADY;
+        return ret;
+     }
+
+   gev->taps.fingers[fingers].repeats[repeats].client = client;
+   gev->taps.fingers[fingers].repeats[repeats].res = resource;
+   gev->taps.fingers[fingers].enabled = EINA_TRUE;
+
+   e_gesture_add_client_destroy_listener(client, E_GESTURE_TYPE_TAP, fingers, 0, repeats, 0, 0);
+
+   if (gev->taps.max_fingers < fingers)
+     gev->taps.max_fingers = fingers;
+   if (gev->taps.fingers[fingers].max_repeats < repeats)
+     gev->taps.fingers[fingers].max_repeats = repeats;
+
+   gesture->grabbed_gesture |= E_GESTURE_TYPE_TAP;
+   gev->taps.state = E_GESTURE_TAP_STATE_READY;
+   gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
+   gesture->gesture_filter = E_GESTURE_TYPE_ALL & ~gesture->grabbed_gesture;
+
+   return ret;
+}
+
+static int
+_e_gesture_ungrab_tap(struct wl_client *client,
+                   struct wl_resource *resource,
+                   uint32_t fingers, uint32_t repeats)
+{
+   int i;
+   E_Gesture_Event *gev;
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   GTINF("client %p requested to ungrab tap gesture (fingers: %d, repeats: %d)\n", client, fingers, fingers);
+
+   if (fingers > E_GESTURE_FINGER_MAX || repeats > E_GESTURE_TAP_REPEATS_MAX)
+     {
+        GTWRN("Not supported fingers /repeats bigger than their maximum values\n");
+        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
+        return ret;
+     }
+
+   gev = &gesture->gesture_events;
+
+   if (gev->taps.fingers[fingers].repeats[repeats].client == client)
+     {
+        gev->taps.fingers[fingers].repeats[repeats].client = NULL;
+        gev->taps.fingers[fingers].repeats[repeats].res = NULL;
+     }
+
+   gev->taps.fingers[fingers].enabled = EINA_FALSE;
+   for (i = 0; i < E_GESTURE_TAP_REPEATS_MAX; i++)
+     {
+        if (gev->taps.fingers[fingers].repeats[i].client)
+          {
+             gev->taps.fingers[fingers].enabled = EINA_TRUE;
+             break;
+          }
+     }
+   gev->taps.fingers[fingers].max_repeats = e_gesture_util_tap_max_repeats_get(fingers);
+
+   _e_gesture_remove_client_destroy_listener(client, E_GESTURE_TYPE_TAP, fingers, 0, repeats, 0, 0);
+   _e_gesture_tap_current_list_check();
+
+   return ret;
+}
+
 static int
 _e_gesture_grab_pan(struct wl_client *client, struct wl_resource *resource, uint32_t fingers)
 {
@@ -346,7 +865,7 @@ _e_gesture_grab_pan(struct wl_client *client, struct wl_resource *resource, uint
         goto finish;
      }
 
-   e_gesture_add_client_destroy_listener(client, E_GESTURE_TYPE_PAN, fingers, 0, 0);
+   e_gesture_add_client_destroy_listener(client, E_GESTURE_TYPE_PAN, fingers, 0, 0, 0, 0);
 
    gev->pans.fingers[fingers].client = client;
    gev->pans.fingers[fingers].res = resource;
@@ -382,7 +901,7 @@ _e_gesture_ungrab_pan(struct wl_client *client, struct wl_resource *resource, ui
         gev->pans.fingers[fingers].res = NULL;
      }
 
-   _e_gesture_remove_client_destroy_listener(client, E_GESTURE_TYPE_PAN, fingers, 0, 0);
+   _e_gesture_remove_client_destroy_listener(client, E_GESTURE_TYPE_PAN, fingers, 0, 0, 0, 0);
    _e_gesture_pan_current_list_check();
 
 finish:
@@ -413,7 +932,7 @@ _e_gesture_grab_pinch(struct wl_client *client, struct wl_resource *resource, ui
         goto finish;
      }
 
-   e_gesture_add_client_destroy_listener(client, E_GESTURE_TYPE_PINCH, fingers, 0, 0);
+   e_gesture_add_client_destroy_listener(client, E_GESTURE_TYPE_PINCH, fingers, 0, 0, 0, 0);
 
    gev->pinchs.fingers[fingers].client = client;
    gev->pinchs.fingers[fingers].res = resource;
@@ -449,13 +968,12 @@ _e_gesture_ungrab_pinch(struct wl_client *client, struct wl_resource *resource, 
         gev->pinchs.fingers[fingers].res = NULL;
      }
 
-   _e_gesture_remove_client_destroy_listener(client, E_GESTURE_TYPE_PINCH, fingers, 0, 0);
+   _e_gesture_remove_client_destroy_listener(client, E_GESTURE_TYPE_PINCH, fingers, 0, 0, 0, 0);
    _e_gesture_pinch_current_list_check();
 
 finish:
    return ret;
 }
-#endif
 
 static int
 _e_gesture_grab_palm_cover(struct wl_client *client, struct wl_resource *resource)
@@ -509,41 +1027,6 @@ _e_gesture_ungrab_palm_cover(struct wl_client *client, struct wl_resource *resou
 }
 
 static int
-_e_gesture_add_surface_destroy_listener(struct wl_resource *surface, int type)
-{
-   struct wl_listener *destroy_listener = NULL;
-   Eina_List *l;
-   struct wl_resource *surface_data;
-
-   EINA_SAFETY_ON_NULL_RETURN_VAL(surface, TIZEN_GESTURE_ERROR_INVALID_DATA);
-   if (type != E_GESTURE_TYPE_PALM_COVER)
-     return TIZEN_GESTURE_ERROR_INVALID_DATA;
-
-   EINA_LIST_FOREACH(gesture->select_surface_list, l, surface_data)
-     {
-        if (surface_data == surface)
-          {
-             return TIZEN_GESTURE_ERROR_NONE;
-          }
-     }
-
-   destroy_listener = E_NEW(struct wl_listener, 1);
-   if (!destroy_listener)
-     {
-        GTERR("Failed to allocate memory for wl_client destroy listener !\n");
-        return TIZEN_GESTURE_ERROR_NO_SYSTEM_RESOURCES;
-     }
-
-   destroy_listener->notify = _e_gesture_wl_surface_cb_destroy;
-   wl_resource_add_destroy_listener(surface, destroy_listener);
-
-   gesture->select_surface_list = eina_list_append(gesture->select_surface_list, surface);
-
-   return TIZEN_GESTURE_ERROR_NONE;
-}
-
-
-static int
 _e_gesture_select_palm_cover(struct wl_client *client, struct wl_resource *resource,
                              struct wl_resource *surface)
 {
@@ -579,35 +1062,6 @@ out:
    return ret;
 }
 
-static void
-_e_gesture_remove_surface_destroy_listener(struct wl_resource *surface, int type)
-{
-   Eina_List *l, *l_next;
-   struct wl_resource *surface_data;
-   struct wl_listener *destroy_listener;
-
-   EINA_SAFETY_ON_NULL_RETURN(surface);
-   if (type != E_GESTURE_TYPE_PALM_COVER) return;
-
-   destroy_listener = wl_resource_get_destroy_listener(surface, _e_gesture_wl_surface_cb_destroy);
-   if (!destroy_listener)
-     {
-        GTWRN("surface(%p) is not gesture selected surface\n", surface);
-     }
-
-   EINA_LIST_FOREACH_SAFE(gesture->select_surface_list, l, l_next, surface_data)
-     {
-        if (surface_data == surface)
-          {
-             gesture->select_surface_list = eina_list_remove_list(gesture->select_surface_list, l);
-             break;
-          }
-     }
-
-   wl_list_remove(&destroy_listener->link);
-   E_FREE(destroy_listener);
-}
-
 static int
 _e_gesture_deselect_palm_cover(struct wl_client *client, struct wl_resource *resource,
                              struct wl_resource *surface)
@@ -632,6 +1086,134 @@ _e_gesture_deselect_palm_cover(struct wl_client *client, struct wl_resource *res
    return ret;
 }
 
+static int
+_e_gesture_server_grab_edge_swipe(unsigned int fingers,
+                                  unsigned int edge, unsigned int edge_size,
+                                  unsigned int start_point, unsigned int end_point)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = _e_gesture_grab_edge_swipe(E_GESTURE_SERVER_CLIENT, E_GESTURE_SERVER_CLIENT,
+                                    fingers, edge, edge_size, start_point, end_point);
+
+   return ret;
+}
+
+static int
+_e_gesture_server_ungrab_edge_swipe(unsigned int fingers,
+                                    unsigned int edge, unsigned int edge_size,
+                                    unsigned int start_point, unsigned int end_point)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = _e_gesture_ungrab_edge_swipe(E_GESTURE_SERVER_CLIENT, E_GESTURE_SERVER_CLIENT, fingers, edge, edge_size, start_point, end_point);
+
+   return ret;
+}
+
+static int
+_e_gesture_server_grab_edge_drag(unsigned int fingers,
+                        unsigned int edge, unsigned int edge_size,
+                        unsigned int start_point, unsigned int end_point)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = _e_gesture_grab_edge_drag(E_GESTURE_SERVER_CLIENT, E_GESTURE_SERVER_CLIENT, fingers, edge, edge_size, start_point, end_point);
+
+   return ret;
+}
+
+static int
+_e_gesture_server_ungrab_edge_drag(unsigned int fingers, unsigned int edge, unsigned int edge_size,
+                          unsigned int start_point, unsigned int end_point)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = _e_gesture_ungrab_edge_drag(E_GESTURE_SERVER_CLIENT, E_GESTURE_SERVER_CLIENT, fingers, edge, edge_size, start_point, end_point);
+
+   return ret;
+}
+
+static int
+_e_gesture_server_grab_tap(unsigned int fingers, unsigned int repeats)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = _e_gesture_grab_tap(E_GESTURE_SERVER_CLIENT, E_GESTURE_SERVER_CLIENT, fingers, repeats);
+
+   return ret;
+}
+
+static int
+_e_gesture_server_ungrab_tap(unsigned int fingers, unsigned int repeats)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = _e_gesture_ungrab_tap(E_GESTURE_SERVER_CLIENT, E_GESTURE_SERVER_CLIENT, fingers, repeats);
+
+   return ret;
+}
+
+static int
+_e_gesture_server_grab_palm_cover(void)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = _e_gesture_grab_palm_cover(E_GESTURE_SERVER_CLIENT, E_GESTURE_SERVER_CLIENT);
+
+   return ret;
+}
+
+static int
+_e_gesture_server_ungrab_palm_cover(void)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = _e_gesture_ungrab_palm_cover(E_GESTURE_SERVER_CLIENT, E_GESTURE_SERVER_CLIENT);
+
+   return ret;
+}
+
+static int
+_e_gesture_server_grab_pan(unsigned int fingers)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = _e_gesture_grab_pan(E_GESTURE_SERVER_CLIENT, E_GESTURE_SERVER_CLIENT, fingers);
+
+   return ret;
+}
+
+static int
+_e_gesture_server_ungrab_pan(unsigned int fingers)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = _e_gesture_ungrab_pan(E_GESTURE_SERVER_CLIENT, E_GESTURE_SERVER_CLIENT, fingers);
+
+   return ret;
+}
+
+static int
+_e_gesture_server_grab_pinch(unsigned int fingers)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = _e_gesture_grab_pinch(E_GESTURE_SERVER_CLIENT, E_GESTURE_SERVER_CLIENT, fingers);
+
+   return ret;
+}
+
+static int
+_e_gesture_server_ungrab_pinch(unsigned int fingers)
+{
+   int ret = TIZEN_GESTURE_ERROR_NONE;
+
+   ret = _e_gesture_ungrab_pinch(E_GESTURE_SERVER_CLIENT, E_GESTURE_SERVER_CLIENT, fingers);
+
+   return ret;
+}
+
 static Eina_Bool
 _e_gesture_deactivate_find_surface(Eina_List *list, struct wl_resource *surface)
 {
@@ -646,26 +1228,6 @@ _e_gesture_deactivate_find_surface(Eina_List *list, struct wl_resource *surface)
           }
      }
    return EINA_FALSE;
-}
-
-static char *
-_e_gesture_util_type_to_string(unsigned int type)
-{
-   switch (type)
-     {
-        case E_GESTURE_TYPE_EDGE_SWIPE:
-          return "edge_swipe";
-        case E_GESTURE_TYPE_TAP:
-          return "tap";
-        case E_GESTURE_TYPE_PALM_COVER:
-          return "palm_cover";
-        case E_GESTURE_TYPE_PAN:
-          return "pan";
-        case E_GESTURE_TYPE_PINCH:
-          return "pinch";
-        default:
-          return "unknown";
-     }
 }
 
 static void
@@ -853,351 +1415,25 @@ _e_gesture_cb_grab_edge_swipe(struct wl_client *client,
                    uint32_t fingers, uint32_t edge, uint32_t edge_size,
                    uint32_t start_point, uint32_t end_point)
 {
-   E_Gesture_Event *gev;
-   int sp = 0, ep = 0;
-   unsigned int ret = TIZEN_GESTURE_ERROR_NONE;
-   E_Gesture_Conf_Edd *conf = gesture->config->conf;
+   int ret = TIZEN_GESTURE_ERROR_NONE;
 
-   GTINF("client %p is request grab gesture, fingers: %d, edge: 0x%x, edge_size: %d, point( %d - %d)\n", client, fingers, edge, edge_size, start_point, end_point);
-   if (fingers > E_GESTURE_FINGER_MAX)
-     {
-        GTWRN("Do not support %d fingers (max: %d)\n", fingers, E_GESTURE_FINGER_MAX);
-        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
-        goto out;
-     }
+   ret = _e_gesture_grab_edge_swipe(client, resource, fingers, edge, edge_size, start_point, end_point);
 
-   gev = &gesture->gesture_events;
-
-   if (edge < TIZEN_GESTURE_EDGE_TOP || edge > TIZEN_GESTURE_EDGE_LEFT)
-     {
-        GTWRN("Invalid edge(%d)\n", edge);
-        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
-        goto out;
-     }
-
-   if (edge_size == TIZEN_GESTURE_EDGE_SIZE_PARTIAL)
-     {
-        sp = start_point;
-        ep = end_point;
-        if (((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM)) &&
-            (ep > e_comp->w))
-          ep = e_comp->w;
-        else if (((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT)) &&
-                 (ep > e_comp->h))
-          ep = e_comp->h;
-     }
-   else if (edge_size == TIZEN_GESTURE_EDGE_SIZE_FULL)
-     {
-        sp = 0;
-        if ((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM))
-          ep = e_comp->w;
-        else if ((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT))
-          ep = e_comp->h;
-     }
-   else
-     {
-        GTWRN("Invalid edge_size(%d)\n", edge_size);
-        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
-        goto out;
-     }
-
-   if ((conf->edge_swipe.default_enable_back) &&
-       (edge == E_GESTURE_EDGE_TOP))
-     {
-        ret = TIZEN_GESTURE_ERROR_GRABBED_ALREADY;
-     }
-   else if (_e_gesture_edge_boundary_check(&gev->edge_swipes.base.fingers[fingers], edge, sp, ep))
-     {
-        _e_gesture_edge_grab_add(&gev->edge_swipes.base.fingers[fingers], client, resource, edge, sp, ep);
-
-        e_gesture_add_client_destroy_listener(client, E_GESTURE_TYPE_EDGE_SWIPE, fingers, edge, 0, sp, ep);
-
-        gesture->grabbed_gesture |= E_GESTURE_TYPE_EDGE_SWIPE;
-        gev->edge_swipes.base.fingers[fingers].enabled = EINA_TRUE;
-        if (gev->event_keep) gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
-        gev->edge_swipes.base.enabled_edge |= (1 << edge);
-
-        ret = TIZEN_GESTURE_ERROR_NONE;
-     }
-   else
-     {
-        ret = TIZEN_GESTURE_ERROR_GRABBED_ALREADY;
-     }
-
-out:
    tizen_gesture_send_grab_edge_swipe_notify(resource, fingers, edge, edge_size, start_point, end_point, ret);
-   return;
-}
-
-static Eina_Bool
-_e_gesture_edge_grabbed_client_check(struct wl_client *client)
-{
-   Eina_List *l;
-   E_Gesture_Event *gev;
-   int i, j;
-   E_Gesture_Event_Edge_Finger_Edge *edata;
-
-   gev = &gesture->gesture_events;
-
-   for (i = 1; i < E_GESTURE_FINGER_MAX + 1; i++)
-     {
-        for (j = 1; j < E_GESTURE_EDGE_MAX + 1; j++)
-          {
-             EINA_LIST_FOREACH(gev->edge_swipes.base.fingers[i].edge[j], l, edata)
-               {
-                  if (edata->client == client) return EINA_TRUE;
-               }
-          }
-     }
-   return EINA_FALSE;
 }
 
 static void
 _e_gesture_cb_ungrab_edge_swipe(struct wl_client *client,
-                           struct wl_resource *resouce,
+                           struct wl_resource *resource,
                            uint32_t fingers, uint32_t edge, uint32_t edge_size,
                            uint32_t start_point, uint32_t end_point)
 {
-   E_Gesture_Event *gev;
-   int ret = TIZEN_GESTURE_ERROR_NONE;
-   int i;
-   Eina_List *l, *l_next;
-   E_Gesture_Event_Edge_Finger_Edge *edata;
-   Eina_Bool flag_removed = EINA_FALSE;
-   int sp = 0, ep = 0;
-
-   GTINF("client %p is request ungrab edge swipe gesture, fingers: %d, edge: 0x%x, edge_size: %d, (%d ~ %d)\n", client, fingers, edge, edge_size, start_point, end_point);
-
-   if (fingers > E_GESTURE_FINGER_MAX)
-     {
-        GTWRN("Do not support %d fingers (max: %d)\n", fingers, E_GESTURE_FINGER_MAX);
-        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
-        goto notify;
-     }
-
-   gev = &gesture->gesture_events;
-
-   if (edge_size == TIZEN_GESTURE_EDGE_SIZE_PARTIAL)
-     {
-        sp = start_point;
-        ep = end_point;
-        if (((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM)) &&
-            (ep > e_comp->w))
-          ep = e_comp->w;
-        else if (((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT)) &&
-                 (ep > e_comp->h))
-          ep = e_comp->h;
-     }
-   else if (edge_size == TIZEN_GESTURE_EDGE_SIZE_FULL)
-     {
-        sp = 0;
-        if ((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM))
-          ep = e_comp->w;
-        else if ((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT))
-          ep = e_comp->h;
-     }
-   else
-     {
-        GTWRN("Invalid edge_size(%d)\n", edge_size);
-        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
-        goto notify;
-     }
-
-   EINA_LIST_FOREACH_SAFE(gev->edge_swipes.base.fingers[fingers].edge[edge], l, l_next, edata)
-     {
-        if ((edata->client == client) && (edata->sp == sp) && (edata->ep == ep))
-          {
-             gev->edge_swipes.base.fingers[fingers].edge[edge] = eina_list_remove_list(
-                gev->edge_swipes.base.fingers[fingers].edge[edge], l);
-             E_FREE(edata);
-             flag_removed = EINA_TRUE;
-          }
-     }
-
-   if (flag_removed)
-     {
-        if (!_e_gesture_edge_grabbed_client_check(client))
-          {
-             _e_gesture_remove_client_destroy_listener(client, E_GESTURE_TYPE_EDGE_SWIPE, fingers, edge, 0, sp, ep);
-             _e_gesture_edge_swipe_current_list_check();
-          }
-     }
-
-   gev->edge_swipes.base.enabled_edge &= ~( 1 << edge);
-   for (i = 0; i < E_GESTURE_FINGER_MAX+1; i++)
-     {
-        if (eina_list_count(gev->edge_swipes.base.fingers[i].edge[edge]) > 0)
-          {
-             gev->edge_swipes.base.enabled_edge |= (1 << edge);
-             break;
-          }
-     }
-
-notify:
-   tizen_gesture_send_grab_edge_swipe_notify(resouce, fingers, edge, edge_size, start_point, end_point, ret);
-   return;
-}
-
-static int
-_e_gesture_grab_edge_drag(struct wl_client *client,
-                          struct wl_resource *resource,
-                          uint32_t fingers, uint32_t edge, uint32_t edge_size,
-                          uint32_t start_point, uint32_t end_point)
-{
-   E_Gesture_Event *gev;
-   int sp = 0, ep = 0;
    int ret = TIZEN_GESTURE_ERROR_NONE;
 
-   GTINF("client %p is request edge_drag grab, fingers: %d, edge: 0x%x, edge_size: %d, point( %d - %d)\n", client, fingers, edge, edge_size, start_point, end_point);
-   if (fingers > E_GESTURE_FINGER_MAX)
-     {
-        GTWRN("Do not support %d fingers (max: %d)\n", fingers, E_GESTURE_FINGER_MAX);
-        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
-        goto out;
-     }
+   ret = _e_gesture_ungrab_edge_swipe(client, resource, fingers, edge, edge_size, start_point, end_point);
 
-   if (edge < TIZEN_GESTURE_EDGE_TOP || edge > TIZEN_GESTURE_EDGE_LEFT)
-     {
-        GTWRN("Invalid edge(%d)\n", edge);
-        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
-        goto out;
-     }
-
-   if (edge_size == TIZEN_GESTURE_EDGE_SIZE_PARTIAL)
-     {
-        sp = start_point;
-        ep = end_point;
-        if (((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM)) &&
-            (ep > e_comp->w))
-          ep = e_comp->w;
-        else if (((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT)) &&
-                 (ep > e_comp->h))
-          ep = e_comp->h;
-     }
-   else if (edge_size == TIZEN_GESTURE_EDGE_SIZE_FULL)
-     {
-        sp = 0;
-        if ((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM))
-          ep = e_comp->w;
-        else if ((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT))
-          ep = e_comp->h;
-     }
-   else
-     {
-        GTWRN("Invalid edge_size(%d)\n", edge_size);
-        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
-        goto out;
-     }
-
-   gev = &gesture->gesture_events;
-
-   if (_e_gesture_edge_boundary_check(&gev->edge_drags.base.fingers[fingers], edge, sp, ep))
-     {
-        _e_gesture_edge_grab_add(&gev->edge_drags.base.fingers[fingers], client, resource, edge, sp, ep);
-
-        e_gesture_add_client_destroy_listener(client, E_GESTURE_TYPE_EDGE_DRAG, fingers, edge, 0, sp, ep);
-
-        gesture->grabbed_gesture |= E_GESTURE_TYPE_EDGE_DRAG;
-        gev->edge_drags.base.fingers[fingers].enabled = EINA_TRUE;
-        if (gev->event_keep) gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
-        gev->edge_drags.base.enabled_edge |= (1 << edge);
-
-        ret = TIZEN_GESTURE_ERROR_NONE;
-     }
-   else
-     {
-        ret = TIZEN_GESTURE_ERROR_GRABBED_ALREADY;
-     }
-
-out:
-   return ret;
+   tizen_gesture_send_grab_edge_swipe_notify(resource, fingers, edge, edge_size, start_point, end_point, ret);
 }
-
-static int
-_e_gesture_ungrab_edge_drag(struct wl_client *client,
-                       struct wl_resource *resouce,
-                       uint32_t fingers, uint32_t edge, uint32_t edge_size,
-                       uint32_t start_point, uint32_t end_point)
-{
-   E_Gesture_Event *gev;
-   int ret = TIZEN_GESTURE_ERROR_NONE;
-   int i;
-   Eina_List *l, *l_next;
-   E_Gesture_Event_Edge_Finger_Edge *edata;
-   Eina_Bool flag_removed = EINA_FALSE;
-   int sp = 0, ep = 0;
-
-   GTINF("client %p is request ungrab edge drag gesture, fingers: %d, edge: 0x%x, edge_size: %d, (%d ~ %d)\n", client, fingers, edge, edge_size, start_point, end_point);
-
-   if (fingers > E_GESTURE_FINGER_MAX)
-     {
-        GTWRN("Do not support %d fingers (max: %d)\n", fingers, E_GESTURE_FINGER_MAX);
-        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
-        goto out;
-     }
-
-   if (edge_size == TIZEN_GESTURE_EDGE_SIZE_PARTIAL)
-     {
-        sp = start_point;
-        ep = end_point;
-        if (((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM)) &&
-            (ep > e_comp->w))
-          ep = e_comp->w;
-        else if (((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT)) &&
-                 (ep > e_comp->h))
-          ep = e_comp->h;
-     }
-   else if (edge_size == TIZEN_GESTURE_EDGE_SIZE_FULL)
-     {
-        sp = 0;
-        if ((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM))
-          ep = e_comp->w;
-        else if ((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT))
-          ep = e_comp->h;
-     }
-   else
-     {
-        GTWRN("Invalid edge_size(%d)\n", edge_size);
-        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
-        goto out;
-     }
-
-   gev = &gesture->gesture_events;
-
-   EINA_LIST_FOREACH_SAFE(gev->edge_drags.base.fingers[fingers].edge[edge], l, l_next, edata)
-     {
-        if ((edata->client == client) && (edata->sp == sp) && (edata->ep == ep))
-          {
-             gev->edge_drags.base.fingers[fingers].edge[edge] = eina_list_remove_list(
-                gev->edge_drags.base.fingers[fingers].edge[edge], l);
-             E_FREE(edata);
-             flag_removed = EINA_TRUE;
-          }
-     }
-
-   if (flag_removed)
-     {
-        if (!_e_gesture_edge_grabbed_client_check(client))
-          {
-             _e_gesture_remove_client_destroy_listener(client, E_GESTURE_TYPE_EDGE_DRAG, fingers, edge, 0, sp, ep);
-             _e_gesture_edge_drag_current_list_check();
-          }
-     }
-
-   gev->edge_drags.base.enabled_edge &= ~( 1 << edge);
-   for (i = 0; i < E_GESTURE_FINGER_MAX+1; i++)
-     {
-        if (eina_list_count(gev->edge_drags.base.fingers[i].edge[edge]) > 0)
-          {
-             gev->edge_drags.base.enabled_edge |= (1 << edge);
-             break;
-          }
-     }
-
-out:
-   return ret;
-}
-
 
 static void
 _e_gesture_cb_grab_edge_drag(struct wl_client *client,
@@ -1230,44 +1466,10 @@ _e_gesture_cb_grab_tap(struct wl_client *client,
                    struct wl_resource *resource,
                    uint32_t fingers, uint32_t repeats)
 {
-   E_Gesture_Event *gev;
    int ret = TIZEN_GESTURE_ERROR_NONE;
 
-   GTINF("client %p requested to grab tap gesture (fingers: %d, repeats: %d)\n", client, fingers, repeats);
+   ret = _e_gesture_grab_tap(client, resource, fingers, repeats);
 
-   if (fingers > E_GESTURE_FINGER_MAX || repeats > E_GESTURE_TAP_REPEATS_MAX)
-     {
-        GTWRN("Not supported fingers /repeats bigger than their maximum values\n");
-        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
-        goto finish;
-     }
-
-   gev = &gesture->gesture_events;
-
-   if (gev->taps.fingers[fingers].repeats[repeats].client)
-     {
-        GTWRN("%d finger %d repeats is already grabbed by %p client\n", fingers, repeats, gev->taps.fingers[fingers].repeats[repeats].client);
-        ret = TIZEN_GESTURE_ERROR_GRABBED_ALREADY;
-        goto finish;
-     }
-
-   gev->taps.fingers[fingers].repeats[repeats].client = client;
-   gev->taps.fingers[fingers].repeats[repeats].res = resource;
-   gev->taps.fingers[fingers].enabled = EINA_TRUE;
-
-   e_gesture_add_client_destroy_listener(client, E_GESTURE_TYPE_TAP, fingers, 0, repeats, 0, 0);
-
-   if (gev->taps.max_fingers < fingers)
-     gev->taps.max_fingers = fingers;
-   if (gev->taps.fingers[fingers].max_repeats < repeats)
-     gev->taps.fingers[fingers].max_repeats = repeats;
-
-   gesture->grabbed_gesture |= E_GESTURE_TYPE_TAP;
-   gev->taps.state = E_GESTURE_TAP_STATE_READY;
-   gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
-   gesture->gesture_filter = E_GESTURE_TYPE_ALL & ~gesture->grabbed_gesture;
-
-finish:
    tizen_gesture_send_tap_notify(resource, fingers, repeats, ret);
 }
 
@@ -1276,42 +1478,10 @@ _e_gesture_cb_ungrab_tap(struct wl_client *client,
                    struct wl_resource *resource,
                    uint32_t fingers, uint32_t repeats)
 {
-   int i;
-   E_Gesture_Event *gev;
    int ret = TIZEN_GESTURE_ERROR_NONE;
 
-   GTINF("client %p requested to ungrab tap gesture (fingers: %d, repeats: %d)\n", client, fingers, fingers);
+   ret = _e_gesture_ungrab_tap(client, resource, fingers, repeats);
 
-   if (fingers > E_GESTURE_FINGER_MAX || repeats > E_GESTURE_TAP_REPEATS_MAX)
-     {
-        GTWRN("Not supported fingers /repeats bigger than their maximum values\n");
-        ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
-        goto finish;
-     }
-
-   gev = &gesture->gesture_events;
-
-   if (gev->taps.fingers[fingers].repeats[repeats].client == client)
-     {
-        gev->taps.fingers[fingers].repeats[repeats].client = NULL;
-        gev->taps.fingers[fingers].repeats[repeats].res = NULL;
-     }
-
-   gev->taps.fingers[fingers].enabled = EINA_FALSE;
-   for (i = 0; i < E_GESTURE_TAP_REPEATS_MAX; i++)
-     {
-        if (gev->taps.fingers[fingers].repeats[i].client)
-          {
-             gev->taps.fingers[fingers].enabled = EINA_TRUE;
-             break;
-          }
-     }
-   gev->taps.fingers[fingers].max_repeats = e_gesture_util_tap_max_repeats_get(fingers);
-
-   _e_gesture_remove_client_destroy_listener(client, E_GESTURE_TYPE_TAP, fingers, 0, repeats, 0, 0);
-   _e_gesture_tap_current_list_check();
-
-finish:
    tizen_gesture_send_tap_notify(resource, fingers, repeats, ret);
 }
 
@@ -1562,6 +1732,22 @@ _e_gesture_init_handlers(void)
    gesture->hooks = eina_list_append(gesture->hooks,
                                      e_client_hook_add(E_CLIENT_HOOK_AUX_HINT_CHANGE,
                                                        _e_gesture_cb_aux_hint_change, NULL));
+
+   if (e_gesture)
+     {
+        e_gesture->edge_swipe.grab = _e_gesture_server_grab_edge_swipe;
+        e_gesture->edge_swipe.ungrab = _e_gesture_server_ungrab_edge_swipe;
+        e_gesture->edge_drag.grab = _e_gesture_server_grab_edge_drag;
+        e_gesture->edge_drag.ungrab = _e_gesture_server_ungrab_edge_drag;
+        e_gesture->tap.grab = _e_gesture_server_grab_tap;
+        e_gesture->tap.ungrab = _e_gesture_server_ungrab_tap;
+        e_gesture->palm_cover.grab = _e_gesture_server_grab_palm_cover;
+        e_gesture->palm_cover.ungrab = _e_gesture_server_ungrab_palm_cover;
+        e_gesture->pan.grab = _e_gesture_server_grab_pan;
+        e_gesture->pan.ungrab = _e_gesture_server_ungrab_pan;
+        e_gesture->pinch.grab = _e_gesture_server_grab_pinch;
+        e_gesture->pinch.ungrab = _e_gesture_server_ungrab_pinch;
+     }
 }
 
 static void
@@ -1580,6 +1766,21 @@ _e_gesture_deinit_handlers(void)
    EINA_LIST_FREE(gesture->hooks, hook)
      {
         e_client_hook_del(hook);
+     }
+   if (e_gesture)
+     {
+        e_gesture->edge_swipe.grab = NULL;
+        e_gesture->edge_swipe.ungrab = NULL;
+        e_gesture->edge_drag.grab = NULL;
+        e_gesture->edge_drag.ungrab = NULL;
+        e_gesture->tap.grab = NULL;
+        e_gesture->tap.ungrab = NULL;
+        e_gesture->palm_cover.grab = NULL;
+        e_gesture->palm_cover.ungrab = NULL;
+        e_gesture->pan.grab = NULL;
+        e_gesture->pan.ungrab = NULL;
+        e_gesture->pinch.grab = NULL;
+        e_gesture->pinch.ungrab = NULL;
      }
 }
 
