@@ -75,6 +75,7 @@ _e_gesture_event_flush(void)
 
    if (gesture->event_state == E_GESTURE_EVENT_STATE_IGNORE ||
       gesture->gesture_events.recognized_gesture) return;
+   if (gesture->gesture_filter != E_GESTURE_TYPE_ALL) return;
 
    gesture->event_state = E_GESTURE_EVENT_STATE_PROPAGATE;
 
@@ -437,9 +438,9 @@ _e_gesture_timer_edge_swipe_start(void *data)
    if ((edge_swipes->base.enabled_finger == 0x0) ||
        (_e_gesture_event_edge_check(&edge_swipes->base.fingers[idx], E_GESTURE_TYPE_EDGE_SWIPE, edge_swipes->base.edge) == EINA_FALSE))
      {
+        _e_gesture_edge_swipe_cancel();
         if (gesture->gesture_events.event_keep)
           _e_gesture_event_flush();
-        _e_gesture_edge_swipe_cancel();
      }
    return ECORE_CALLBACK_CANCEL;
 }
@@ -451,9 +452,9 @@ _e_gesture_timer_edge_swipe_done(void *data)
 
    GTDBG("Edge_Swipe done timer is expired. Currently alived edge_swipe fingers: 0x%x\n", edge_swipes->base.enabled_finger);
 
+   _e_gesture_edge_swipe_cancel();
    if (gesture->gesture_events.event_keep)
      _e_gesture_event_flush();
-   _e_gesture_edge_swipe_cancel();
 
    return ECORE_CALLBACK_CANCEL;
 }
@@ -502,9 +503,9 @@ _e_gesture_process_edge_swipe_down(Ecore_Event_Mouse_Button *ev)
           }
         else
           {
+             _e_gesture_edge_swipe_cancel();
              if (gesture->gesture_events.event_keep)
                _e_gesture_event_flush();
-             _e_gesture_edge_swipe_cancel();
           }
      }
    else
@@ -512,9 +513,9 @@ _e_gesture_process_edge_swipe_down(Ecore_Event_Mouse_Button *ev)
         edge_swipes->base.enabled_finger &= ~(1 << (gesture->gesture_events.num_pressed - 1));
         if (edge_swipes->start_timer == NULL)
           {
+             _e_gesture_edge_swipe_cancel();
              if (gesture->gesture_events.event_keep)
                _e_gesture_event_flush();
-             _e_gesture_edge_swipe_cancel();
           }
      }
 }
@@ -540,9 +541,9 @@ _e_gesture_process_edge_swipe_move(Ecore_Event_Mouse_Move *ev)
         case E_GESTURE_EDGE_TOP:
            if (diff.x > conf->edge_swipe.min_length)
              {
+                _e_gesture_edge_swipe_cancel();
                 if (gesture->gesture_events.event_keep)
                   _e_gesture_event_flush();
-                _e_gesture_edge_swipe_cancel();
                 break;
              }
            if (diff.y > conf->edge_swipe.max_length)
@@ -553,9 +554,9 @@ _e_gesture_process_edge_swipe_move(Ecore_Event_Mouse_Move *ev)
         case E_GESTURE_EDGE_LEFT:
            if (diff.y > conf->edge_swipe.min_length)
              {
+                _e_gesture_edge_swipe_cancel();
                 if (gesture->gesture_events.event_keep)
                   _e_gesture_event_flush();
-                _e_gesture_edge_swipe_cancel();
                 break;
              }
            if (diff.x > conf->edge_swipe.max_length)
@@ -566,9 +567,9 @@ _e_gesture_process_edge_swipe_move(Ecore_Event_Mouse_Move *ev)
         case E_GESTURE_EDGE_BOTTOM:
            if (diff.x > conf->edge_swipe.min_length)
              {
+                _e_gesture_edge_swipe_cancel();
                 if (gesture->gesture_events.event_keep)
                   _e_gesture_event_flush();
-                _e_gesture_edge_swipe_cancel();
                 break;
              }
            if (diff.y > conf->edge_swipe.max_length)
@@ -579,9 +580,9 @@ _e_gesture_process_edge_swipe_move(Ecore_Event_Mouse_Move *ev)
         case E_GESTURE_EDGE_RIGHT:
            if (diff.y > conf->edge_swipe.min_length)
              {
+                _e_gesture_edge_swipe_cancel();
                 if (gesture->gesture_events.event_keep)
                   _e_gesture_event_flush();
-                _e_gesture_edge_swipe_cancel();
                 break;
              }
            if (diff.x > conf->edge_swipe.max_length)
@@ -601,9 +602,9 @@ _e_gesture_process_edge_swipe_up(Ecore_Event_Mouse_Button *ev)
    E_Gesture_Event_Edge_Swipe *edge_swipes = &gesture->gesture_events.edge_swipes;
 
    if (!edge_swipes->base.activation.active) return;
+   _e_gesture_edge_swipe_cancel();
    if (gesture->gesture_events.event_keep)
      _e_gesture_event_flush();
-   _e_gesture_edge_swipe_cancel();
 }
 
 static void
@@ -712,9 +713,9 @@ _e_gesture_timer_edge_drag_start(void *data)
    if ((edge_drags->base.enabled_finger == 0x0) ||
        (_e_gesture_event_edge_check(&edge_drags->base.fingers[idx], E_GESTURE_TYPE_EDGE_DRAG, edge_drags->base.edge) == EINA_FALSE))
      {
+        _e_gesture_edge_drag_cancel();
         if (gesture->gesture_events.event_keep)
           _e_gesture_event_flush();
-        _e_gesture_edge_drag_cancel();
      }
    else
      {
@@ -773,9 +774,9 @@ _e_gesture_process_edge_drag_down(Ecore_Event_Mouse_Button *ev)
           }
         else
           {
+             _e_gesture_edge_drag_cancel();
              if (gesture->gesture_events.event_keep)
                _e_gesture_event_flush();
-             _e_gesture_edge_drag_cancel();
           }
      }
    else
@@ -783,9 +784,9 @@ _e_gesture_process_edge_drag_down(Ecore_Event_Mouse_Button *ev)
         edge_drags->base.enabled_finger &= ~(1 << (gesture->gesture_events.num_pressed - 1));
         if (edge_drags->start_timer == NULL)
           {
+             _e_gesture_edge_drag_cancel();
              if (gesture->gesture_events.event_keep)
                _e_gesture_event_flush();
-             _e_gesture_edge_drag_cancel();
           }
      }
 }
@@ -827,9 +828,9 @@ _e_gesture_process_edge_drag_up(Ecore_Event_Mouse_Button *ev)
    E_Gesture_Event_Edge_Drag *edge_drags = &gesture->gesture_events.edge_drags;
 
    if (!edge_drags->base.activation.active) return;
+   _e_gesture_edge_drag_cancel();
    if (gesture->gesture_events.event_keep)
      _e_gesture_event_flush();
-   _e_gesture_edge_drag_cancel();
 }
 
 
@@ -1291,6 +1292,8 @@ _e_gesture_timer_tap_interval(void *data)
      }
    else
      {
+        /* All fingers are released. */
+        gesture->gesture_filter = E_GESTURE_TYPE_ALL;
         _e_gesture_tap_cancel();
 
         gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
