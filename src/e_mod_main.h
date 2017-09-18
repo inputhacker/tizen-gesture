@@ -290,6 +290,7 @@ struct _E_Gesture_Event_Tap
    E_Gesture_Event_Tap_Finger fingers[E_GESTURE_FINGER_MAX + 2];
    E_Gesture_Tap_State state;
    unsigned int enabled_finger;
+   unsigned int current_finger;
    unsigned int repeats;
    unsigned int max_fingers;
 

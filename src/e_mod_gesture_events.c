@@ -1209,6 +1209,7 @@ _e_gesture_tap_cancel(void)
 
    taps->repeats = 0;
    taps->enabled_finger = 0;
+   taps->current_finger = 0;
    taps->state = E_GESTURE_TAP_STATE_READY;
    taps->base_rect.x1 = 0;
    taps->base_rect.y1 = 0;
@@ -1343,6 +1344,7 @@ _e_gesture_tap_done(void)
              ecore_timer_del(taps->done_timer);
              taps->done_timer = NULL;
           }
+        taps->current_finger = 0;
         if (taps->repeats == taps->fingers[taps->enabled_finger].max_repeats)
           {
              ecore_timer_del(taps->interval_timer);
@@ -1370,6 +1372,8 @@ _e_gesture_process_tap_down(Ecore_Event_Mouse_Button *ev)
 
    if (taps->enabled_finger < gesture->gesture_events.num_pressed)
        taps->enabled_finger = gesture->gesture_events.num_pressed;
+
+   taps->current_finger++;
 
    if (taps->enabled_finger > taps->max_fingers)
      _e_gesture_tap_cancel();
@@ -1452,6 +1456,9 @@ _e_gesture_process_tap_up(Ecore_Event_Mouse_Button *ev)
    if (!taps->activation.active) return;
 
    if (gesture->gesture_events.recognized_gesture)
+     _e_gesture_tap_cancel();
+
+   if (taps->enabled_finger != taps->current_finger)
      _e_gesture_tap_cancel();
 
    switch (taps->state)
