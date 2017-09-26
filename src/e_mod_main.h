@@ -3,7 +3,6 @@
 
 #include <e.h>
 #include <tizen-extension-server-protocol.h>
-#include <Ecore_Drm.h>
 #include <Ecore_Input_Evas.h>
 
 #define GTERR(msg, ARG...) ERR("[tizen_gesture][%s:%d] "msg, __FUNCTION__, __LINE__, ##ARG)
