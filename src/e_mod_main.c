@@ -124,6 +124,7 @@ e_gesture_add_client_destroy_listener(struct wl_client *client, int mode, int fi
    if (!grabbed_client)
      {
         GTERR("Failed to allocate memory to save client information !\n");
+        E_FREE(destroy_listener);
         return TIZEN_GESTURE_ERROR_NO_SYSTEM_RESOURCES;
      }
 
@@ -450,30 +451,30 @@ _e_gesture_grab_edge_swipe(struct wl_client *client,
 
    gev = &gesture->gesture_events;
 
-   if (edge < TIZEN_GESTURE_EDGE_TOP || edge > TIZEN_GESTURE_EDGE_LEFT)
+   if (edge < E_GESTURE_EDGE_TOP || edge > E_GESTURE_EDGE_LEFT)
      {
         GTWRN("Invalid edge(%d)\n", edge);
         ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
         return ret;
      }
 
-   if (edge_size == TIZEN_GESTURE_EDGE_SIZE_PARTIAL)
+   if (edge_size == E_GESTURE_EDGE_SIZE_PARTIAL)
      {
         sp = start_point;
         ep = end_point;
-        if (((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM)) &&
+        if (((edge == E_GESTURE_EDGE_TOP) || (edge == E_GESTURE_EDGE_BOTTOM)) &&
             (ep > e_comp->w))
           ep = e_comp->w;
-        else if (((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT)) &&
+        else if (((edge == E_GESTURE_EDGE_RIGHT) || (edge == E_GESTURE_EDGE_LEFT)) &&
                  (ep > e_comp->h))
           ep = e_comp->h;
      }
-   else if (edge_size == TIZEN_GESTURE_EDGE_SIZE_FULL)
+   else if (edge_size == E_GESTURE_EDGE_SIZE_FULL)
      {
         sp = 0;
-        if ((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM))
+        if ((edge == E_GESTURE_EDGE_TOP) || (edge == E_GESTURE_EDGE_BOTTOM))
           ep = e_comp->w;
-        else if ((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT))
+        else if ((edge == E_GESTURE_EDGE_RIGHT) || (edge == E_GESTURE_EDGE_LEFT))
           ep = e_comp->h;
      }
    else
@@ -534,23 +535,23 @@ _e_gesture_ungrab_edge_swipe(struct wl_client *client,
 
    gev = &gesture->gesture_events;
 
-   if (edge_size == TIZEN_GESTURE_EDGE_SIZE_PARTIAL)
+   if (edge_size == E_GESTURE_EDGE_SIZE_PARTIAL)
      {
         sp = start_point;
         ep = end_point;
-        if (((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM)) &&
+        if (((edge == E_GESTURE_EDGE_TOP) || (edge == E_GESTURE_EDGE_BOTTOM)) &&
             (ep > e_comp->w))
           ep = e_comp->w;
-        else if (((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT)) &&
+        else if (((edge == E_GESTURE_EDGE_RIGHT) || (edge == E_GESTURE_EDGE_LEFT)) &&
                  (ep > e_comp->h))
           ep = e_comp->h;
      }
-   else if (edge_size == TIZEN_GESTURE_EDGE_SIZE_FULL)
+   else if (edge_size == E_GESTURE_EDGE_SIZE_FULL)
      {
         sp = 0;
-        if ((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM))
+        if ((edge == E_GESTURE_EDGE_TOP) || (edge == E_GESTURE_EDGE_BOTTOM))
           ep = e_comp->w;
-        else if ((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT))
+        else if ((edge == E_GESTURE_EDGE_RIGHT) || (edge == E_GESTURE_EDGE_LEFT))
           ep = e_comp->h;
      }
    else
@@ -611,30 +612,30 @@ _e_gesture_grab_edge_drag(struct wl_client *client,
         goto out;
      }
 
-   if (edge < TIZEN_GESTURE_EDGE_TOP || edge > TIZEN_GESTURE_EDGE_LEFT)
+   if (edge < E_GESTURE_EDGE_TOP || edge > E_GESTURE_EDGE_LEFT)
      {
         GTWRN("Invalid edge(%d)\n", edge);
         ret = TIZEN_GESTURE_ERROR_INVALID_DATA;
         goto out;
      }
 
-   if (edge_size == TIZEN_GESTURE_EDGE_SIZE_PARTIAL)
+   if (edge_size == E_GESTURE_EDGE_SIZE_PARTIAL)
      {
         sp = start_point;
         ep = end_point;
-        if (((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM)) &&
+        if (((edge == E_GESTURE_EDGE_TOP) || (edge == E_GESTURE_EDGE_BOTTOM)) &&
             (ep > e_comp->w))
           ep = e_comp->w;
-        else if (((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT)) &&
+        else if (((edge == E_GESTURE_EDGE_RIGHT) || (edge == E_GESTURE_EDGE_LEFT)) &&
                  (ep > e_comp->h))
           ep = e_comp->h;
      }
-   else if (edge_size == TIZEN_GESTURE_EDGE_SIZE_FULL)
+   else if (edge_size == E_GESTURE_EDGE_SIZE_FULL)
      {
         sp = 0;
-        if ((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM))
+        if ((edge == E_GESTURE_EDGE_TOP) || (edge == E_GESTURE_EDGE_BOTTOM))
           ep = e_comp->w;
-        else if ((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT))
+        else if ((edge == E_GESTURE_EDGE_RIGHT) || (edge == E_GESTURE_EDGE_LEFT))
           ep = e_comp->h;
      }
    else
@@ -691,23 +692,23 @@ _e_gesture_ungrab_edge_drag(struct wl_client *client,
         goto out;
      }
 
-   if (edge_size == TIZEN_GESTURE_EDGE_SIZE_PARTIAL)
+   if (edge_size == E_GESTURE_EDGE_SIZE_PARTIAL)
      {
         sp = start_point;
         ep = end_point;
-        if (((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM)) &&
+        if (((edge == E_GESTURE_EDGE_TOP) || (edge == E_GESTURE_EDGE_BOTTOM)) &&
             (ep > e_comp->w))
           ep = e_comp->w;
-        else if (((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT)) &&
+        else if (((edge == E_GESTURE_EDGE_RIGHT) || (edge == E_GESTURE_EDGE_LEFT)) &&
                  (ep > e_comp->h))
           ep = e_comp->h;
      }
-   else if (edge_size == TIZEN_GESTURE_EDGE_SIZE_FULL)
+   else if (edge_size == E_GESTURE_EDGE_SIZE_FULL)
      {
         sp = 0;
-        if ((edge == TIZEN_GESTURE_EDGE_TOP) || (edge == TIZEN_GESTURE_EDGE_BOTTOM))
+        if ((edge == E_GESTURE_EDGE_TOP) || (edge == E_GESTURE_EDGE_BOTTOM))
           ep = e_comp->w;
-        else if ((edge == TIZEN_GESTURE_EDGE_RIGHT) || (edge == TIZEN_GESTURE_EDGE_LEFT))
+        else if ((edge == E_GESTURE_EDGE_RIGHT) || (edge == E_GESTURE_EDGE_LEFT))
           ep = e_comp->h;
      }
    else
@@ -1857,7 +1858,7 @@ _e_gesture_init(E_Module *m)
         gesture->grabbed_gesture |= E_GESTURE_TYPE_EDGE_SWIPE;
         gesture->gesture_events.edge_swipes.base.fingers[1].enabled = EINA_TRUE;
         _e_gesture_edge_grab_add(&gesture->gesture_events.edge_swipes.base.fingers[1], (void *)0x1, (void *)0x1, E_GESTURE_EDGE_TOP, 0, 0);
-        gesture->gesture_events.edge_swipes.base.enabled_edge |= (1 << TIZEN_GESTURE_EDGE_TOP);
+        gesture->gesture_events.edge_swipes.base.enabled_edge |= (1 << E_GESTURE_EDGE_TOP);
         if (gesture->gesture_events.event_keep)
           {
              gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
