@@ -64,7 +64,7 @@ _e_gesture_event_queue(int type, void *event)
 
 error:
    if (e_info->event) E_FREE(e_info->event);
-   if (e_info) E_FREE(e_info);
+   E_FREE(e_info);
 }
 
 static void
@@ -323,13 +323,13 @@ _e_gesture_send_edge_swipe(int fingers, int x, int y, int edge)
         goto finish;
      }
 
-   if (edge == TIZEN_GESTURE_EDGE_TOP ||
-       edge == TIZEN_GESTURE_EDGE_BOTTOM)
+   if (edge == E_GESTURE_EDGE_TOP ||
+       edge == E_GESTURE_EDGE_BOTTOM)
      {
         bp = x;
      }
-   else if (edge == TIZEN_GESTURE_EDGE_RIGHT ||
-       edge == TIZEN_GESTURE_EDGE_LEFT)
+   else if (edge == E_GESTURE_EDGE_RIGHT ||
+       edge == E_GESTURE_EDGE_LEFT)
      {
         bp = y;
      }
@@ -352,7 +352,7 @@ _e_gesture_send_edge_swipe(int fingers, int x, int y, int edge)
                   ecore_event_add(E_EVENT_GESTURE_EDGE_SWIPE, ev_swipe, NULL, NULL);
                }
              else
-               tizen_gesture_send_edge_swipe(edata->res, TIZEN_GESTURE_MODE_DONE, fingers, x, y, edge);
+               tizen_gesture_send_edge_swipe(edata->res, E_GESTURE_MODE_DONE, fingers, x, y, edge);
              break;
           }
      }
@@ -386,9 +386,9 @@ _e_gesture_event_edge_check(E_Gesture_Event_Edge_Finger *fingers, int type, unsi
    if (type == E_GESTURE_TYPE_EDGE_SWIPE)
      {
         if ((conf->edge_swipe.default_enable_back) &&
-            (edge == TIZEN_GESTURE_EDGE_TOP ||
+            (edge == E_GESTURE_EDGE_TOP ||
             ((edge_swipes->combined_keycode == conf->edge_swipe.compose_key) &&
-            (edge_swipes->base.edge == TIZEN_GESTURE_EDGE_LEFT))))
+            (edge_swipes->base.edge == E_GESTURE_EDGE_LEFT))))
           {
              return EINA_TRUE;
           }
@@ -399,8 +399,8 @@ _e_gesture_event_edge_check(E_Gesture_Event_Edge_Finger *fingers, int type, unsi
 
    EINA_LIST_FOREACH(fingers->edge[edge], l, edata)
      {
-        if (edge == TIZEN_GESTURE_EDGE_TOP ||
-            edge == TIZEN_GESTURE_EDGE_BOTTOM)
+        if (edge == E_GESTURE_EDGE_TOP ||
+            edge == E_GESTURE_EDGE_BOTTOM)
           {
              if ((coords.x >= edata->sp) &&
                  (coords.x <= edata->ep))
@@ -408,8 +408,8 @@ _e_gesture_event_edge_check(E_Gesture_Event_Edge_Finger *fingers, int type, unsi
                   return EINA_TRUE;
                }
           }
-        else if ((edge == TIZEN_GESTURE_EDGE_LEFT) ||
-                 (edge == TIZEN_GESTURE_EDGE_RIGHT))
+        else if ((edge == E_GESTURE_EDGE_LEFT) ||
+                 (edge == E_GESTURE_EDGE_RIGHT))
           {
              if (coords.y >= edata->sp &&
                  coords.y <= edata->ep)
@@ -616,7 +616,7 @@ _e_gesture_edge_drag_cancel(void)
    if (gesture->gesture_events.recognized_gesture & E_GESTURE_TYPE_EDGE_DRAG)
      {
         _e_gesture_util_center_axis_get(edge_drags->idx, &current_point.x, &current_point.y);
-        _e_gesture_send_edge_drag(edge_drags->idx, current_point.x, current_point.y, edge_drags->base.edge, TIZEN_GESTURE_MODE_END);
+        _e_gesture_send_edge_drag(edge_drags->idx, current_point.x, current_point.y, edge_drags->base.edge, E_GESTURE_MODE_END);
      }
 
    if (edge_drags->start_timer)
@@ -660,13 +660,13 @@ _e_gesture_send_edge_drag(int fingers, int x, int y, int edge, int mode)
         ecore_event_add(ECORE_EVENT_MOUSE_BUTTON_CANCEL, ev_cancel, NULL, NULL);
      }
 
-   if (edge == TIZEN_GESTURE_EDGE_TOP ||
-       edge == TIZEN_GESTURE_EDGE_BOTTOM)
+   if (edge == E_GESTURE_EDGE_TOP ||
+       edge == E_GESTURE_EDGE_BOTTOM)
      {
         bp = edge_drags->start_point.x;
      }
-   else if (edge == TIZEN_GESTURE_EDGE_RIGHT ||
-       edge == TIZEN_GESTURE_EDGE_LEFT)
+   else if (edge == E_GESTURE_EDGE_RIGHT ||
+       edge == E_GESTURE_EDGE_LEFT)
      {
         bp = edge_drags->start_point.y;
      }
@@ -723,7 +723,7 @@ _e_gesture_timer_edge_drag_start(void *data)
         edge_drags->start_point.x = edge_drags->center_point.x = start_point.x;
         edge_drags->start_point.y = edge_drags->center_point.y = start_point.y;
         edge_drags->idx = idx;
-        _e_gesture_send_edge_drag(edge_drags->idx, edge_drags->center_point.x, edge_drags->center_point.y, edge_drags->base.edge, TIZEN_GESTURE_MODE_BEGIN);
+        _e_gesture_send_edge_drag(edge_drags->idx, edge_drags->center_point.x, edge_drags->center_point.y, edge_drags->base.edge, E_GESTURE_MODE_BEGIN);
      }
 
    ecore_timer_del(edge_drags->start_timer);
@@ -819,7 +819,7 @@ _e_gesture_process_edge_drag_move(Ecore_Event_Mouse_Move *ev)
 
    _e_gesture_send_edge_drag(edge_drags->idx,
       edge_drags->center_point.x, edge_drags->center_point.y,
-      edge_drags->base.edge, TIZEN_GESTURE_MODE_UPDATE);
+      edge_drags->base.edge, E_GESTURE_MODE_UPDATE);
 }
 
 static void
@@ -840,7 +840,7 @@ _e_gesture_pan_send(int mode, int fingers, int cx, int cy, struct wl_resource *r
    Ecore_Event_Mouse_Button *ev_cancel;
    E_Event_Gesture_Pan *ev_pan;
 
-   if (mode == TIZEN_GESTURE_MODE_BEGIN)
+   if (mode == E_GESTURE_MODE_BEGIN)
      {
         ev_cancel = E_NEW(Ecore_Event_Mouse_Button, 1);
         EINA_SAFETY_ON_NULL_RETURN(ev_cancel);
@@ -885,7 +885,7 @@ _e_gesture_pan_cancel(void)
      }
 
    if (pans->state == E_GESTURE_PANPINCH_STATE_MOVING)
-     _e_gesture_pan_send(TIZEN_GESTURE_MODE_END, pans->num_pan_fingers, 0, 0,
+     _e_gesture_pan_send(E_GESTURE_MODE_END, pans->num_pan_fingers, 0, 0,
                          pans->fingers[pans->num_pan_fingers].res,
                          pans->fingers[pans->num_pan_fingers].client);
 
@@ -966,12 +966,12 @@ _e_gesture_process_pan_move(Ecore_Event_Mouse_Move *ev)
         switch (pans->state)
           {
              case E_GESTURE_PANPINCH_STATE_START:
-                mode = TIZEN_GESTURE_MODE_BEGIN;
+                mode = E_GESTURE_MODE_BEGIN;
                 pans->state = E_GESTURE_PANPINCH_STATE_MOVING;
                 pans->num_pan_fingers = idx;
                 break;
              case E_GESTURE_PANPINCH_STATE_MOVING:
-                mode = TIZEN_GESTURE_MODE_UPDATE;
+                mode = E_GESTURE_MODE_UPDATE;
                 break;
              default:
                 return;
@@ -982,8 +982,8 @@ _e_gesture_process_pan_move(Ecore_Event_Mouse_Move *ev)
 
         _e_gesture_pan_send(mode, idx, cur_point.x, cur_point.y, pans->fingers[idx].res, pans->fingers[idx].client);
 
-        if (mode == TIZEN_GESTURE_MODE_BEGIN)
-          mode = TIZEN_GESTURE_MODE_UPDATE;
+        if (mode == E_GESTURE_MODE_BEGIN)
+          mode = E_GESTURE_MODE_UPDATE;
      }
 }
 
@@ -1002,7 +1002,7 @@ _e_gesture_pinch_send(int mode, int fingers, double distance, double angle, int 
    Ecore_Event_Mouse_Button *ev_cancel;
    E_Event_Gesture_Pinch *ev_pinch;
 
-   if (mode == TIZEN_GESTURE_MODE_BEGIN)
+   if (mode == E_GESTURE_MODE_BEGIN)
      {
         ev_cancel = E_NEW(Ecore_Event_Mouse_Button, 1);
         EINA_SAFETY_ON_NULL_RETURN(ev_cancel);
@@ -1049,7 +1049,7 @@ _e_gesture_pinch_cancel(void)
      }
 
    if (pinchs->state == E_GESTURE_PANPINCH_STATE_MOVING)
-     _e_gesture_pinch_send(TIZEN_GESTURE_MODE_END, pinchs->num_pinch_fingers, 0.0, 0.0, 0, 0,
+     _e_gesture_pinch_send(E_GESTURE_MODE_END, pinchs->num_pinch_fingers, 0.0, 0.0, 0, 0,
                            pinchs->fingers[pinchs->num_pinch_fingers].res,
                            pinchs->fingers[pinchs->num_pinch_fingers].client);
 
@@ -1122,12 +1122,12 @@ _e_gesture_process_pinch_move(Ecore_Event_Mouse_Move *ev)
         switch (pinch->state)
           {
              case E_GESTURE_PANPINCH_STATE_START:
-                mode = TIZEN_GESTURE_MODE_BEGIN;
+                mode = E_GESTURE_MODE_BEGIN;
                 pinch->state = E_GESTURE_PANPINCH_STATE_MOVING;
                 pinch->num_pinch_fingers = idx;
                 break;
              case E_GESTURE_PANPINCH_STATE_MOVING:
-                mode = TIZEN_GESTURE_MODE_UPDATE;
+                mode = E_GESTURE_MODE_UPDATE;
                 break;
              default:
                 return;
@@ -1238,7 +1238,7 @@ _e_gesture_send_tap(int fingers, int repeats, struct wl_client *client, struct w
         ecore_event_add(E_EVENT_GESTURE_TAP, ev_tap, NULL, NULL);
      }
    else
-     tizen_gesture_send_tap(res, TIZEN_GESTURE_MODE_DONE, fingers, repeats);
+     tizen_gesture_send_tap(res, E_GESTURE_MODE_DONE, fingers, repeats);
    _e_gesture_event_drop();
    gesture->gesture_events.recognized_gesture |= E_GESTURE_TYPE_TAP;
 
@@ -1780,8 +1780,8 @@ _e_gesture_send_palm_cover(void)
              surface = NULL;
           }
 
-        tizen_gesture_send_palm_cover(palm_covers->client_info.res, surface, TIZEN_GESTURE_MODE_BEGIN, duration, size, pressure, cx, cy);
-        tizen_gesture_send_palm_cover(palm_covers->client_info.res, surface, TIZEN_GESTURE_MODE_END, duration, size, pressure, cx, cy);
+        tizen_gesture_send_palm_cover(palm_covers->client_info.res, surface, E_GESTURE_MODE_BEGIN, duration, size, pressure, cx, cy);
+        tizen_gesture_send_palm_cover(palm_covers->client_info.res, surface, E_GESTURE_MODE_END, duration, size, pressure, cx, cy);
      }
 
    gesture->event_state = E_GESTURE_EVENT_STATE_IGNORE;
