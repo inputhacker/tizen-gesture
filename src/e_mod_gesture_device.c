@@ -59,25 +59,24 @@ e_gesture_device_keydev_set(char *option)
      }
 }
 
-Ecore_Device *
-_e_gesture_device_ecore_device_get(char *path, unsigned int clas)
+Evas_Device *
+_e_gesture_device_evas_device_get(char *path, unsigned int clas)
 {
    const Eina_List *dev_list = NULL;
    const Eina_List *l;
-   Ecore_Device *dev = NULL;
+   Evas_Device *dev = NULL;
    const char *identifier;
 
    if (!path) return NULL;
 
-   dev_list = ecore_device_list();
+   dev_list = evas_device_list(ecore_evas_get(e_comp->ee), NULL);
    if (!dev_list) return NULL;
    EINA_LIST_FOREACH(dev_list, l, dev)
      {
-        if (!dev) continue;
-        GTINF("dev: %s\n", ecore_device_name_get(dev));
-        identifier = ecore_device_identifier_get(dev);
+        GTINF("dev: %s\n", evas_device_name_get(dev));
+        identifier = evas_device_description_get(dev);
         if (!identifier) continue;
-        if ((ecore_device_class_get(dev) == clas) && !(strcmp(identifier, path)))
+        if ((evas_device_class_get(dev) == clas) && !(strcmp(identifier, path)))
           return dev;
      }
 
@@ -85,9 +84,9 @@ _e_gesture_device_ecore_device_get(char *path, unsigned int clas)
 }
 
 E_Gesture_Event_State
-e_gesture_device_add(Ecore_Event_Device_Info *ev)
+e_gesture_device_add(E_Input_Event_Input_Device_Add *ev)
 {
-   if (ev->clas == ECORE_DEVICE_CLASS_TOUCH)
+   if (ev->clas == EVAS_DEVICE_CLASS_TOUCH)
      {
         char *id;
         id = strdup(ev->identifier);
@@ -95,7 +94,7 @@ e_gesture_device_add(Ecore_Event_Device_Info *ev)
         GTINF("%s(%s) device is touch device: add list\n", ev->name, ev->identifier);
      }
    if ((!gesture->device.kbd_identifier) &&
-       (ev->clas == ECORE_DEVICE_CLASS_KEYBOARD))
+       (ev->clas == EVAS_DEVICE_CLASS_KEYBOARD))
      {
         if (gesture->device.kbd_name)
           {
@@ -103,7 +102,7 @@ e_gesture_device_add(Ecore_Event_Device_Info *ev)
                {
                   GTINF("%s(%s) device is key generated device in gesture\n", ev->name, ev->identifier);
                   gesture->device.kbd_identifier = strdup(ev->identifier);
-                  gesture->device.kbd_device = _e_gesture_device_ecore_device_get(gesture->device.kbd_identifier, ECORE_DEVICE_CLASS_KEYBOARD);
+                  gesture->device.kbd_device = _e_gesture_device_evas_device_get(gesture->device.kbd_identifier, EVAS_DEVICE_CLASS_KEYBOARD);
                }
           }
         else
@@ -111,19 +110,19 @@ e_gesture_device_add(Ecore_Event_Device_Info *ev)
              GTINF("%s(%s) device is key generated device in gesture\n", ev->name, ev->identifier);
              gesture->device.kbd_name = strdup(ev->name);
              gesture->device.kbd_identifier = strdup(ev->identifier);
-             gesture->device.kbd_device = _e_gesture_device_ecore_device_get(gesture->device.kbd_identifier, ECORE_DEVICE_CLASS_KEYBOARD);
+             gesture->device.kbd_device = _e_gesture_device_evas_device_get(gesture->device.kbd_identifier, EVAS_DEVICE_CLASS_KEYBOARD);
           }
      }
    return E_GESTURE_EVENT_STATE_PROPAGATE;
 }
 
 E_Gesture_Event_State
-e_gesture_device_del(Ecore_Event_Device_Info *ev)
+e_gesture_device_del(E_Input_Event_Input_Device_Del *ev)
 {
    Eina_List *l, *l_next;
    char *data;
 
-   if (ev->clas == ECORE_DEVICE_CLASS_TOUCH)
+   if (ev->clas == EVAS_DEVICE_CLASS_TOUCH)
      {
         EINA_LIST_FOREACH_SAFE(gesture->device.touch_devices, l, l_next, data)
           {
@@ -136,7 +135,7 @@ e_gesture_device_del(Ecore_Event_Device_Info *ev)
           }
      }
    if ((gesture->device.kbd_identifier) &&
-       (ev->clas == ECORE_DEVICE_CLASS_KEYBOARD))
+       (ev->clas == EVAS_DEVICE_CLASS_KEYBOARD))
      {
         if (!strncmp(ev->name, gesture->device.kbd_name, strlen(gesture->device.kbd_name)))
           {
@@ -149,9 +148,9 @@ e_gesture_device_del(Ecore_Event_Device_Info *ev)
 }
 
 Eina_Bool
-e_gesture_is_touch_device(const Ecore_Device *dev)
+e_gesture_is_touch_device(const Evas_Device *dev)
 {
-   if (ecore_device_class_get(dev) == ECORE_DEVICE_CLASS_TOUCH)
+   if (evas_device_class_get(dev) == EVAS_DEVICE_CLASS_TOUCH)
      return EINA_TRUE;
 
    return EINA_FALSE;

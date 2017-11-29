@@ -1877,9 +1877,9 @@ e_gesture_process_events(void *event, int type)
      res = _e_gesture_process_key_down(event);
    else if (type == ECORE_EVENT_KEY_UP)
      res = _e_gesture_process_key_up(event);
-   else if (type == ECORE_EVENT_DEVICE_ADD)
+   else if (type == E_INPUT_EVENT_INPUT_DEVICE_ADD)
      res = _e_gesture_process_device_add(event);
-   else if (type == ECORE_EVENT_DEVICE_DEL)
+   else if (type == E_INPUT_EVENT_INPUT_DEVICE_DEL)
      res = _e_gesture_process_device_del(event);
    else if (type == ECORE_EVENT_AXIS_UPDATE)
      res = _e_gesture_process_axis_update(event);

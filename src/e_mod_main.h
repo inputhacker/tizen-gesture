@@ -386,7 +386,7 @@ struct _E_Gesture
       int uinp_fd;
       char *kbd_identifier;
       char *kbd_name;
-      Ecore_Device *kbd_device;
+      Evas_Device *kbd_device;
    } device;
 
    unsigned int grabbed_gesture;
@@ -415,9 +415,9 @@ void e_gesture_conf_deinit(E_Gesture_Config_Data *gconfig);
 
 /* Device control */
 void e_gesture_device_shutdown(void);
-E_Gesture_Event_State e_gesture_device_add(Ecore_Event_Device_Info *ev);
-E_Gesture_Event_State e_gesture_device_del(Ecore_Event_Device_Info *ev);
-Eina_Bool e_gesture_is_touch_device(const Ecore_Device *dev);
+E_Gesture_Event_State e_gesture_device_add(E_Input_Event_Input_Device_Add *ev);
+E_Gesture_Event_State e_gesture_device_del(E_Input_Event_Input_Device_Del *ev);
+Eina_Bool e_gesture_is_touch_device(const Evas_Device *dev);
 void e_gesture_device_keydev_set(char *option);
 
 void e_gesture_event_filter_enable(Eina_Bool enabled);
