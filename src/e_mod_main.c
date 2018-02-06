@@ -216,7 +216,7 @@ _e_gesture_pan_current_list_check(void)
 
    gev = &gesture->gesture_events;
 
-   gesture->grabbed_gesture &= ~E_GESTURE_TYPE_TAP;
+   gesture->grabbed_gesture &= ~E_GESTURE_TYPE_PAN;
    gev->pans.state = E_GESTURE_PANPINCH_STATE_NONE;
 
    for (i = 0; i < E_GESTURE_FINGER_MAX; i++)
