@@ -215,6 +215,13 @@ _e_gesture_util_rect_get(int finger, int *x1, int *y1, int *x2, int *y2)
      }
 }
 
+static void
+_e_gesture_util_rect_center_axis_get(Rect rect, int *cx, int *cy)
+{
+   *cx = (int)((rect.x1 + rect.x2) / 2);
+   *cy = (int)((rect.y1 + rect.y2) / 2);
+}
+
 static struct wl_resource *
 _e_gesture_util_eclient_surface_get(E_Client *ec)
 {
@@ -1232,11 +1239,13 @@ _e_gesture_tap_cancel(void)
 }
 
 static void
-_e_gesture_send_tap(int fingers, int repeats, struct wl_client *client, struct wl_resource *res)
+_e_gesture_send_tap(int fingers, int repeats, int cx, int cy,
+                    struct wl_client *client, struct wl_resource *res)
 {
    E_Event_Gesture_Tap *ev_tap;
 
-   GTINF("Send Tap gesture. %d fingers %d repeats to client (%p)\n", fingers, repeats, client);
+   GTINF("Send Tap gesture. %d fingers %d repeats to client (%p) with cx=%d and cy=%d\n",
+          fingers, repeats, client, cx, cy);
    if (client == E_GESTURE_SERVER_CLIENT)
      {
         ev_tap = E_NEW(E_Event_Gesture_Tap, 1);
@@ -1245,6 +1254,8 @@ _e_gesture_send_tap(int fingers, int repeats, struct wl_client *client, struct w
         ev_tap->mode = E_GESTURE_MODE_DONE;
         ev_tap->fingers = fingers;
         ev_tap->repeats = repeats;
+        ev_tap->cx = cx;
+        ev_tap->cy = cy;
 
         ecore_event_add(E_EVENT_GESTURE_TAP, ev_tap, NULL, NULL);
      }
@@ -1292,10 +1303,13 @@ static Eina_Bool
 _e_gesture_timer_tap_interval(void *data)
 {
    E_Gesture_Event_Tap *taps = &gesture->gesture_events.taps;
+   Coords cur_point = {0,};
 
    if (taps->fingers[taps->enabled_finger].repeats[taps->repeats].client)
      {
+       _e_gesture_util_rect_center_axis_get(taps->base_rect, &cur_point.x, &cur_point.y);
         _e_gesture_send_tap(taps->enabled_finger, taps->repeats,
+                            cur_point.x, cur_point.y,
            taps->fingers[taps->enabled_finger].repeats[taps->repeats].client,
            taps->fingers[taps->enabled_finger].repeats[taps->repeats].res);
         gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
