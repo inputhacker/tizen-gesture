@@ -256,6 +256,8 @@ _e_gesture_keyevent_free(void *data EINA_UNUSED, void *ev)
    eina_stringshare_del(e->key);
    eina_stringshare_del(e->compose);
 
+   if (e->dev) ecore_device_unref(e->dev);
+
    E_FREE(e);
 }
 
@@ -280,7 +282,7 @@ _e_gesture_send_back_key(Eina_Bool pressed)
    ev->timestamp = (int)(ecore_time_get()*1000);
    ev->same_screen = 1;
    ev->keycode = conf->edge_swipe.back_key;
-   ev->dev = gesture->device.kbd_device;
+   ev->dev = ecore_device_ref(gesture->device.kbd_device);
    ev->window = e_comp->ee_win;
 
    if (pressed)
