@@ -3,6 +3,10 @@
 #include <string.h>
 #include <linux/uinput.h>
 
+#define GT_IOCTL_SET_BIT(fd, bit, val) \
+   ret = ioctl(fd, bit, val); \
+   if (ret) GTWRN("Failed to set %s to fd(%d) (ret: %d)\n", #val, fd, ret)
+
 static void
 _e_gesture_device_keydev_create(void)
 {
@@ -22,11 +26,10 @@ _e_gesture_device_keydev_create(void)
    uinp.id.version = 4;
    uinp.id.bustype = BUS_USB;
 
-   ioctl(uinp_fd, UI_SET_EVBIT, EV_KEY);
-   ioctl(uinp_fd, UI_SET_EVBIT, EV_SYN);
-   ioctl(uinp_fd, UI_SET_EVBIT, EV_MSC);
-
-   ioctl(uinp_fd, UI_SET_KEYBIT, KEY_BACK);
+   GT_IOCTL_SET_BIT(uinp_fd, UI_SET_EVBIT, EV_KEY);
+   GT_IOCTL_SET_BIT(uinp_fd, UI_SET_EVBIT, EV_SYN);
+   GT_IOCTL_SET_BIT(uinp_fd, UI_SET_EVBIT, EV_MSC);
+   GT_IOCTL_SET_BIT(uinp_fd, UI_SET_KEYBIT, KEY_BACK);
 
    ret = write(uinp_fd, &uinp, sizeof(struct uinput_user_dev));
    if (ret < 0)
