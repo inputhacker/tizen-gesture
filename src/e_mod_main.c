@@ -388,12 +388,6 @@ _e_gesture_remove_surface_destroy_listener(struct wl_resource *surface, int type
    EINA_SAFETY_ON_NULL_RETURN(surface);
    if (type != E_GESTURE_TYPE_PALM_COVER) return;
 
-   destroy_listener = wl_resource_get_destroy_listener(surface, _e_gesture_wl_surface_cb_destroy);
-   if (!destroy_listener)
-     {
-        GTWRN("surface(%p) is not gesture selected surface\n", surface);
-     }
-
    EINA_LIST_FOREACH_SAFE(gesture->select_surface_list, l, l_next, surface_data)
      {
         if (surface_data == surface)
@@ -403,8 +397,16 @@ _e_gesture_remove_surface_destroy_listener(struct wl_resource *surface, int type
           }
      }
 
-   wl_list_remove(&destroy_listener->link);
-   E_FREE(destroy_listener);
+   destroy_listener = wl_resource_get_destroy_listener(surface, _e_gesture_wl_surface_cb_destroy);
+   if (destroy_listener)
+     {
+        wl_list_remove(&destroy_listener->link);
+        E_FREE(destroy_listener);
+     }
+   else
+     {
+        GTWRN("surface(%p) is not gesture selected surface\n", surface);
+     }
 }
 
 static Eina_Bool
