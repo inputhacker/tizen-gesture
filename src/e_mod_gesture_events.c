@@ -270,11 +270,14 @@ _e_gesture_send_back_key(Eina_Bool pressed)
 {
    Ecore_Event_Key *ev;
    E_Gesture_Conf_Edd *conf = gesture->config->conf;
+   E_Keyrouter_Event_Data *key_data;
 
    EINA_SAFETY_ON_NULL_RETURN(e_comp_wl->xkb.keymap);
 
    ev = E_NEW(Ecore_Event_Key, 1);
    EINA_SAFETY_ON_NULL_RETURN(ev);
+   key_data = E_NEW(E_Keyrouter_Event_Data, 1);
+   EINA_SAFETY_ON_NULL_GOTO(key_data, failed);
 
    ev->key = (char *)eina_stringshare_add("XF86Back");
    ev->keyname = (char *)eina_stringshare_add(ev->key);
@@ -284,11 +287,17 @@ _e_gesture_send_back_key(Eina_Bool pressed)
    ev->keycode = conf->edge_swipe.back_key;
    ev->dev = ecore_device_ref(gesture->device.kbd_device);
    ev->window = e_comp->ee_win;
+   ev->data = key_data;
 
    if (pressed)
      ecore_event_add(ECORE_EVENT_KEY_DOWN, ev, _e_gesture_keyevent_free, NULL);
    else
      ecore_event_add(ECORE_EVENT_KEY_UP, ev, _e_gesture_keyevent_free, NULL);
+
+   return;
+
+failed:
+   if (ev) E_FREE(ev);
 }
 
 static void
