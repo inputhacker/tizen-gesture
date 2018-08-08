@@ -72,6 +72,7 @@ _e_gesture_event_flush(void)
 {
    Eina_List *l, *l_next;
    E_Gesture_Event_Info *data;
+   Eina_Bool flushed = EINA_FALSE;
 
    if (gesture->event_state == E_GESTURE_EVENT_STATE_IGNORE ||
       gesture->gesture_events.recognized_gesture) return;
@@ -81,29 +82,40 @@ _e_gesture_event_flush(void)
 
    EINA_LIST_FOREACH_SAFE(gesture->event_queue, l, l_next, data)
      {
-        if (data->type == ECORE_EVENT_MOUSE_BUTTON_DOWN)
+        if (!e_devicemgr_is_blocking_event(ECORE_DEVICE_CLASS_TOUCH))
           {
-             ecore_event_evas_mouse_button_down(NULL, ECORE_EVENT_MOUSE_BUTTON_DOWN, data->event);
+             if (data->type == ECORE_EVENT_MOUSE_BUTTON_DOWN)
+               {
+                  ecore_event_evas_mouse_button_down(NULL, ECORE_EVENT_MOUSE_BUTTON_DOWN, data->event);
+                  flushed = EINA_TRUE;
+               }
+             else if (data->type == ECORE_EVENT_MOUSE_BUTTON_UP)
+               {
+                  ecore_event_evas_mouse_button_up(NULL, ECORE_EVENT_MOUSE_BUTTON_UP, data->event);
+                  flushed = EINA_TRUE;
+               }
+             else if (data->type == ECORE_EVENT_MOUSE_MOVE)
+               {
+                  ecore_event_evas_mouse_move(NULL, ECORE_EVENT_MOUSE_MOVE, data->event);
+                  flushed = EINA_TRUE;
+               }
           }
-        else if (data->type == ECORE_EVENT_MOUSE_BUTTON_UP)
+        if (!flushed && !e_devicemgr_is_blocking_event(ECORE_DEVICE_CLASS_KEYBOARD))
           {
-             ecore_event_evas_mouse_button_up(NULL, ECORE_EVENT_MOUSE_BUTTON_UP, data->event);
+             if (data->type == ECORE_EVENT_KEY_DOWN)
+               {
+                  ecore_event_evas_key_down(NULL, ECORE_EVENT_KEY_DOWN, data->event);
+               }
+             else if (data->type == ECORE_EVENT_KEY_UP)
+               {
+                  ecore_event_evas_key_up(NULL, ECORE_EVENT_KEY_UP, data->event);
+               }
           }
-        else if (data->type == ECORE_EVENT_MOUSE_MOVE)
-          {
-             ecore_event_evas_mouse_move(NULL, ECORE_EVENT_MOUSE_MOVE, data->event);
-          }
-        else if (data->type == ECORE_EVENT_KEY_DOWN)
-          {
-             ecore_event_evas_key_down(NULL, ECORE_EVENT_KEY_DOWN, data->event);
-          }
-        else if (data->type == ECORE_EVENT_KEY_UP)
-          {
-             ecore_event_evas_key_up(NULL, ECORE_EVENT_KEY_UP, data->event);
-          }
+
         E_FREE(data->event);
         E_FREE(data);
         gesture->event_queue = eina_list_remove_list(gesture->event_queue, l);
+        flushed = EINA_FALSE;
      }
 }
 
