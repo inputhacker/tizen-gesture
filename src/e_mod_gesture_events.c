@@ -1805,8 +1805,15 @@ _e_gesture_send_palm_cover(void)
              surface = NULL;
           }
 
-        tizen_gesture_send_palm_cover(palm_covers->client_info.res, surface, E_GESTURE_MODE_BEGIN, duration, size, pressure, cx, cy);
-        tizen_gesture_send_palm_cover(palm_covers->client_info.res, surface, E_GESTURE_MODE_END, duration, size, pressure, cx, cy);
+        if (!res)
+          {
+             GTWRN("Failed to find grabbed client(%p), palm_grabbed: %d\n", palm_covers->client_info.client, gesture->grabbed_gesture & E_GESTURE_TYPE_PALM_COVER);
+          }
+        else
+          {
+             tizen_gesture_send_palm_cover(res, surface, E_GESTURE_MODE_BEGIN, duration, size, pressure, cx, cy);
+             tizen_gesture_send_palm_cover(res, surface, E_GESTURE_MODE_END, duration, size, pressure, cx, cy);
+          }
      }
 
    gesture->event_state = E_GESTURE_EVENT_STATE_IGNORE;
