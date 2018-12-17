@@ -1710,15 +1710,25 @@ static void
 _e_gesture_cb_aux_hint_change(void *data EINA_UNUSED, E_Client *ec)
 {
    E_Client *qp_ec;
+   Eina_List *list, *l;
+   Eina_Bool res_return = EINA_FALSE;
    if (e_object_is_del(E_OBJECT(ec)) || !ec->comp_data) return;
    if (!ec->comp_data->aux_hint.changed) return;
 
-   qp_ec = e_service_quickpanel_client_get();
+   list = e_service_quickpanels_get();
+   EINA_LIST_FOREACH(list, l, qp_ec)
+     {
+        /* Return if the aux hint change didn't happen to the focused ec */
+        if ((ec != qp_ec) &&
+            (ec != e_client_focused_get()))
+          {
+             res_return = EINA_TRUE;
+             break;
+          }
+     }
+   list = eina_list_free(list);
 
-   /* Return if the aux hint change didn't happen to the focused ec */
-   if ((ec != qp_ec) &&
-       (ec != e_client_focused_get()))
-     return;
+   if (res_return) return;
 
    _e_gesture_window_gesture_disabled_change(ec);
 }
