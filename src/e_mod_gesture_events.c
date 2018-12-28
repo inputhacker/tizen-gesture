@@ -528,6 +528,8 @@ _e_gesture_process_edge_swipe_down(Ecore_Event_Mouse_Button *ev)
      }
    else
      {
+        edge_swipes->base.fingers[idx].start.x = ev->x;
+        edge_swipes->base.fingers[idx].start.y = ev->y;
         edge_swipes->base.enabled_finger &= ~(1 << (gesture->gesture_events.num_pressed - 1));
         if (edge_swipes->start_timer == NULL)
           {

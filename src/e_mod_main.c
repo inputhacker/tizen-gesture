@@ -502,6 +502,8 @@ _e_gesture_grab_edge_swipe(struct wl_client *client,
         if (gev->event_keep) gesture->event_state = E_GESTURE_EVENT_STATE_KEEP;
         gev->edge_swipes.base.enabled_edge |= (1 << edge);
 
+        gesture->gesture_filter = E_GESTURE_TYPE_ALL & ~gesture->grabbed_gesture;
+
         ret = TIZEN_GESTURE_ERROR_NONE;
      }
    else
